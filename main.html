@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BanG Dream! 12 樂團星光殿堂</title>
+    <style>
+        :root {
+            --bg-color: #0f1020;
+            --card-bg: rgba(255, 255, 255, 0.07);
+            --text-color: #f0f0f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background: var(--bg-color); color: var(--text-color); min-height: 100vh; padding: 20px; }
+        header { text-align: center; margin-bottom: 30px; }
+        header h1 { font-size: 2.2rem; color: #ff79c6; margin-bottom: 10px; }
+        header p { color: #8be9fd; font-size: 1.1rem; }
+        
+        .container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 320px 1fr; gap: 30px; }
+        @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+        
+        /* 左側導覽選單區 */
+        .sidebar { background: var(--card-bg); padding: 20px; border-radius: 16px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .sidebar h3 { font-size: 1.1rem; margin-bottom: 15px; color: #ff79c6; border-left: 4px solid #ff79c6; padding-left: 8px; }
+
+        .band-list { display: flex; flex-direction: column; gap: 8px; max-height: 600px; overflow-y: auto; padding-right: 5px; }
+        .band-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px 15px; text-align: left; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 0.95rem; }
+        .band-btn:hover, .band-btn.active { background: #bd93f9; color: #1e1f29; font-weight: bold; }
+
+        /* 右側詳細資訊區 */
+        .content-panel { background: var(--card-bg); padding: 30px; border-radius: 16px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .band-info h2 { font-size: 2rem; color: #50fa7b; margin-bottom: 10px; }
+        .band-info p { color: #f8f8f2; line-height: 1.6; margin-bottom: 20px; }
+        
+        .section-title { font-size: 1.2rem; color: #8be9fd; margin: 20px 0 10px; border-left: 4px solid #8be9fd; padding-left: 8px; }
+        .songs-list { list-style: inside; color: #ffb86c; margin-bottom: 20px; }
+        .songs-list li { margin-bottom: 5px; }
+
+        .members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
+        .member-card { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        
+        /* 使用 contain 確保全身立繪完整不被切掉 */
+        .member-card img { 
+            width: 100%; 
+            height: 160px; 
+            object-fit: contain; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            background: rgba(0, 0, 0, 0.4); 
+            padding: 4px;
+        }
+        
+        .member-card h4 { font-size: 0.95rem; color: #f8f8f2; margin-bottom: 4px; }
+        .member-card span { font-size: 0.8rem; color: #ff79c6; display: block; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🎸 BanG Dream! 12 樂團星光殿堂 ✨</h1>
+        <p>從左側點選心儀的樂團，探索完整的介紹、熱門歌曲與精美立繪陣容吧！🐾</p>
+    </header>
+
+    <div class="container">
+        <!-- 左側選單 -->
+        <div class="sidebar">
+            <h3>🎶 12 樂團圖鑑總覽</h3>
+            <div class="band-list" id="bandListContainer"></div>
+        </div>
+
+        <!-- 右側內容面板 -->
+        <div class="content-panel" id="contentPanel">
+            <div class="band-info">
+                <h2>請選擇一個樂團</h2>
+                <p>點擊左側的樂團按鈕，即可在此查看樂團介紹、熱門歌曲與完整成員資料！✨</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const bandsData = {
+            "Poppin'Party": {
+                name: "Poppin'Party (流行樂團)",
+                desc: "由戶山香澄所創立的高中生女子樂團，以「閃閃發光、心動不已的聲音」為核心概念，充滿青春朝氣與王道搖滾風格。",
+                songs: ["Kizuna Music♪", "Time Lapse", "Teardrops", "B.O.F"],
+                members: [
+                    { name: "戶山香澄", role: "主唱兼節奏吉他", cv: "愛美", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/4/4b/Kasumi_Toyama.png/250px-Kasumi_Toyama.png" },
+                    { name: "花園多惠", role: "主音吉他手", cv: "大塚紗英", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/d/d4/Tae_Hanazono.png/250px-Tae_Hanazono.png" },
+                    { name: "牛込里美", role: "貝斯手", cv: "西本里美", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/a/a3/Rimi_Ushigome.png/250px-Rimi_Ushigome.png" },
+                    { name: "山吹沙綾", role: "鼓手", cv: "大橋彩香", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/1/16/Saaya_Yamabuki.png/250px-Saaya_Yamabuki.png" },
+                    { name: "市谷有咲", role: "鍵盤手", cv: "伊藤彩沙", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/c/c5/Arisa_Ichigaya.png/250px-Arisa_Ichigaya.png" }
+                ]
+            },
+            "Afterglow": {
+                name: "Afterglow (青春搖滾樂團)",
+                desc: "青梅竹馬五人組成的正統派搖滾樂團，重視彼此的羈絆，曲風帶有強烈的龐克與疾走感。",
+                songs: ["Y.O.L.O.!!!!!", "Tied to the Skies", "Scarlet Sky", "Sasanqua"],
+                members: [
+                    { name: "美竹蘭", role: "主唱兼節奏吉他", cv: "佐倉綾音", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/9/91/Ran_Mitake.png/250px-Ran_Mitake.png" },
+                    { name: "青葉摩卡", role: "主音吉他手", cv: "三澤紗千香", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/5/50/Moca_Aoba.png/250px-Moca_Aoba.png" },
+                    { name: "上原緋馬", role: "貝斯手", cv: "加藤英美里", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/2/23/Himari_Uehara.png/250px-Himari_Uehara.png" },
+                    { name: "宇田川巴", role: "鼓手", cv: "日笠陽子", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/0/07/Tomoe_Udagawa.png/250px-Tomoe_Udagawa.png" },
+                    { name: "羽澤鶇", role: "鍵盤手", cv: "金元壽子", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/5/52/Tsugumi_Hazawa.png/250px-Tsugumi_Hazawa.png" }
+                ]
+            },
+            "Pastel*Palettes": {
+                name: "Pastel*Palettes (偶像系樂團)",
+                desc: "經紀公司旗下的偶像組合樂團，以「無論何時都全力以赴的可愛偶像」為特色，傳遞滿滿正能量。",
+                songs: ["Zettai Sengen～Recital～", "Kyuumutsu! Pastel Pale-tto", "Happy Synthesizer", "Mou Ichido Luminous"],
+                members: [
+                    { name: "丸山彩", role: "主唱", cv: "前島亞美", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/b/be/Aya_Maruyama.png/250px-Aya_Maruyama.png" },
+                    { name: "冰川日菜", role: "主音吉他手", cv: "小澤亞李", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/f/f3/Hina_Hikawa.png/250px-Hina_Hikawa.png" },
+                    { name: "白鷺千聖", role: "貝斯手", cv: "上坂堇", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/7/7b/Chisato_Shirasagi.png/250px-Chisato_Shirasagi.png" },
+                    { name: "大和麻彌", role: "鼓手", cv: "中上育實", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/5/57/Maya_Yamato.png/250px-Maya_Yamato.png" },
+                    { name: "若宮伊芙", role: "鍵盤手", cv: "秦佐和子", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/3/36/Eve_Wakamiya.png/250px-Eve_Wakamiya.png" }
+                ]
+            },
+            "Roselia": {
+                name: "Roselia (頂級哥德搖滾樂團)",
+                desc: "追求技術至高境界、具有強烈哥德與交響金屬風格的實力派樂團，聲望與現場張力頂尖。",
+                songs: ["LOUDER", "BLACK SHOUT", "R", "FIRE BIRD"],
+                members: [
+                    { name: "湊友希那", role: "主唱", cv: "相羽亞衣奈", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/6/67/Yukina_Minato.png/250px-Yukina_Minato.png" },
+                    { name: "冰川紗夜", role: "主音吉他手", cv: "工藤晴香", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/e/e6/Sayo_Hikawa.png/250px-Sayo_Hikawa.png" },
+                    { name: "今井莉莎", role: "貝斯手", cv: "中島由貴", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/7/73/Lisa_Imai.png/250px-Lisa_Imai.png" },
+                    { name: "宇田川亞子", role: "鼓手", cv: "櫻川惠", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/2/25/Ako_Udagawa.png/250px-Ako_Udagawa.png" },
+                    { name: "白金燐子", role: "鍵盤手", cv: "志崎樺音", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/d/d7/Rinko_Shirokane.png/250px-Rinko_Shirokane.png" }
+                ]
+            },
+            "Hello, Happy World!": {
+                name: "Hello, Happy World! (歡樂向樂團)",
+                desc: "以「讓世界充滿笑容」為宗旨的大型歡樂樂團，曲風繽紛熱鬧，帶有管樂與豐富的嘉年華感。",
+                songs: ["Goka! Gokai!? Phantom Thief!", "Egao Sing A Song", "Smile Parade", "Kimi ga Inakucha!"],
+                members: [
+                    { name: "弦卷心", role: "主唱", cv: "伊藤美來", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/d/db/Kokoro_Tsurumaki.png/250px-Kokoro_Tsurumaki.png" },
+                    { name: "瀨田薰", role: "吉他手", cv: "田所梓", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/9/98/Kaoru_Seta.png/250px-Kaoru_Seta.png" },
+                    { name: "北澤育美", role: "貝斯手", cv: "吉田有里", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/a/a2/Hagumi_Kitazawa.png/250px-Hagumi_Kitazawa.png" },
+                    { name: "松原花音", role: "鼓手", cv: "豐田萌繪", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/8/8c/Kanon_Matsubara.png/250px-Kanon_Matsubara.png" },
+                    { name: "奧澤美咲 (米歇爾)", role: "DJ", cv: "黑澤朋世", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/8/86/Misaki_Okusawa.png/250px-Misaki_Okusawa.png" }
+                ]
+            },
+            "RAISE A SUILEN": {
+                name: "RAISE A SUILEN (電子搖滾樂團)",
+                desc: "充滿爆發力與強烈電子音效的次世代硬派樂團，現場演奏實力極強，簡稱 RAS。",
+                songs: ["UNSTOPPABLE", "R·I·O·T", "EXPOSE 'Burn out!'", "CORUSCATE -DNA-"],
+                members: [
+                    { name: "LAYER (和田帶)", role: "主唱兼貝斯", cv: "Raychell", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/4/42/Layer_Bandori.png/250px-Layer_Bandori.png" },
+                    { name: "LOCK (朝日六花)", role: "吉他手", cv: "小原莉子", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/f/f6/Lock_Bandori.png/250px-Lock_Bandori.png" },
+                    { name: "MASKING (佐藤園樹)", role: "鼓手", cv: "夏芽", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/5/5b/Masking_Bandori.png/250px-Masking_Bandori.png" },
+                    { name: "PAREO (鳰原令旺奈)", role: "鍵盤手", cv: "倉知玲鳳", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/8/88/Pareo_Bandori.png/250px-Pareo_Bandori.png" },
+                    { name: "CHU² (玉置楚楚)", role: "DJ", cv: "紡木吏佐", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/0/07/Chiyu_Bandori.png/250px-Chiyu_Bandori.png" }
+                ]
+            },
+            "Morfonica": {
+                name: "Morfonica (小提琴交響樂團)",
+                desc: "融合小提琴與夢幻交響搖滾的高中生樂團，曲風空靈浪漫，充滿文學與大自然意象。",
+                songs: ["Daylight -デイライト-", "Flame of Hope", "Melt Snow", "Harmonia viva"],
+                members: [
+                    { name: "倉田真白", role: "主唱", cv: "進藤天音", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/a/a2/Mashiro_Kurata.png/250px-Mashiro_Kurata.png" },
+                    { name: "桐谷透子", role: "吉他手", cv: "西尾夕香", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/3/3f/Toko_Kirigaya.png/250px-Toko_Kirigaya.png" },
+                    { name: "廣町七深", role: "貝斯手", cv: "西本里美", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/3/33/Nanami_Hiromachi.png/250px-Nanami_Hiromachi.png" },
+                    { name: "二葉筑紫", role: "鼓手", cv: "mika", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/0/05/Tsukushi_Futaba.png/250px-Tsukushi_Futaba.png" },
+                    { name: "八潮瑠唯", role: "小提琴手", cv: "Ayasa", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/b/b5/Rui_Yashio.png/250px-Rui_Yashio.png" }
+                ]
+            },
+            "MyGO!!!!!": {
+                name: "MyGO!!!!! (迷茫系青春樂團)",
+                desc: "以「迷子でもいい、迷子でも進め。」（迷茫也無所謂，迷茫著也要前進）為核心，情感深刻、歌詞直擊人心的超人氣樂團。",
+                songs: ["Mayoiuta", "Haruhikage", "Utakotoba", "Kibou no Tsubasa"],
+                members: [
+                    { name: "高松燈", role: "主唱", cv: "羊宮妃那", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/f/f0/Tomori_Takamatsu.png/250px-Tomori_Takamatsu.png" },
+                    { name: "千早愛音", role: "吉他手", cv: "立石凜", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/5/57/Anon_Chihaya.png/250px-Anon_Chihaya.png" },
+                    { name: "要樂奈", role: "主音吉他手", cv: "青木陽菜", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/2/23/Rana_Kaname.png/250px-Rana_Kaname.png" },
+                    { name: "長崎爽世", role: "貝斯手", cv: "小日向美香", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/3/31/Soyo_Nagasaki.png/250px-Soyo_Nagasaki.png" },
+                    { name: "椎名立希", role: "鼓手", cv: "林鼓子", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/7/77/Taki_Shiina.png/250px-Taki_Shiina.png" }
+                ]
+            },
+            "Ave Mujica": {
+                name: "Ave Mujica (假面歌德金屬樂團)",
+                desc: "神祕、暗黑、帶有強烈戲劇張力與假面歌德風格的頂級樂團，與 MyGO 擁有深厚故事羈絆。",
+                songs: ["Black Birthday", "Kyuuseishu", "Ether", "Symbol I : ▲ Symbol"],
+                members: [
+                    { name: "Doloris (豐川祥子)", role: "主唱兼鍵盤", cv: "高尾奏音", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/7/7c/Sakiko_Toyokawa.png/250px-Sakiko_Toyokawa.png" },
+                    { name: "Mortis (祐天寺若麥)", role: "鼓手", cv: "米澤茜", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/6/6b/Aisuru_Yutenji.png/250px-Aisuru_Yutenji.png" },
+                    { name: "Timoris (八幡海鈴)", role: "貝斯手", cv: "岡田夢以", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/6/6e/Umiri_Yahata.png/250px-Umiri_Yahata.png" },
+                    { name: "Amoris (三角初華)", role: "吉他手", cv: "佐佐木李子", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/2/27/Ui_Misumi.png/250px-Ui_Misumi.png" },
+                    { name: "Oblivionis (若葉睦)", role: "吉他手", cv: "渡瀨結月", img: "https://upload.wikimedia.org/wikipedia/zh/thumb/b/be/Mutsumi_Wakaba.png/250px-Mutsumi_Wakaba.png" }
+                ]
+            },
+            "夢限大MewType": {
+                name: "夢限大MewType (虛擬實況樂團)",
+                desc: "BanG Dream! 首支以虛擬實況主（VTuber）為主軸的次世代樂團，充滿奇幻與無限想像力的曲風。",
+                songs: ["Mewtype Anthem", "Dreamer's High", "Virtual Party Night"],
+                members: [
+                    { name: "仲町阿拉蕾", role: "主唱 (Vo.)", cv: "官方未公開", img: "" },
+                    { name: "宮永野乃花", role: "吉他手 (Gt.)", cv: "官方未公開", img: "" },
+                    { name: "峰月律", role: "吉他手 (Gt.)", cv: "官方未公開", img: "" },
+                    { name: "藤都子", role: "鍵盤手 (Key.)", cv: "官方未公開", img: "" },
+                    { name: "千石由乃", role: "DJ & Mp.", cv: "官方未公開", img: "" }
+                ]
+            },
+            "millsage": {
+                name: "millsage (新世代清新樂團)",
+                desc: "由天才鍵盤手兼主唱汐見蛍領軍，風格清新、帶有獨特都會感與柔和旋律的質感樂團。",
+                songs: ["Millsprout", "Sage Green", "Blessing Notes"],
+                members: [
+                    { name: "汐見蛍", role: "鍵盤兼主唱", cv: "薬師寺李有", img: "" },
+                    { name: "伊沢なつめ", role: "吉他手", cv: "千春", img: "" },
+                    { name: "琴平凪", role: "吉他手", cv: "結川あさき", img: "" },
+                    { name: "浜崎まほろ", role: "貝斯手", cv: "伊駒ゆりえ", img: "" },
+                    { name: "和泉朋花", role: "鼓手", cv: "咲川ひなの", img: "" }
+                ]
+            },
+            "一家Dumb Rock!": {
+                name: "一家Dumb Rock! (地下龐克樂團)",
+                desc: "生活苦難用爆音かき消す（用爆音消音）的ファンキー＆グルーヴィー（放克與律動感）雙主唱龐克樂團。",
+                songs: ["ピースフル・ピースシーズ！", "Dumb Rock Spirits", "Smile & Noise"],
+                members: [
+                    { name: "須賀蕾叶", role: "吉他兼主唱", cv: "橘めい", img: "" },
+                    { name: "馬橋心玖", role: "吉他兼主唱", cv: "涼泉桜花", img: "" },
+                    { name: "矢倉蓬咲", role: "貝斯手", cv: "花宮初奈", img: "" },
+                    { name: "梅里ちえり", role: "鼓手", cv: "菱川花菜", img: "" },
+                    { name: "四宮寧月", role: "鍵盤手", cv: "遠野ひかる", img: "" }
+                ]
+            }
+        };
+
+        const bandKeys = Object.keys(bandsData);
+        const bandListContainer = document.getElementById('bandListContainer');
+        const contentPanel = document.getElementById('contentPanel');
+
+        function initList() {
+            bandListContainer.innerHTML = '';
+            bandKeys.forEach((key) => {
+                const btn = document.createElement('button');
+                btn.className = 'band-btn';
+                btn.innerText = key;
+                btn.onclick = () => selectBand(key);
+                bandListContainer.appendChild(btn);
+            });
+        }
+
+        function selectBand(bandName) {
+            document.querySelectorAll('.band-btn').forEach(btn => {
+                if(btn.innerText === bandName) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            const data = bandsData[bandName];
+            if(!data) return;
+
+            let membersHtml = data.members.map(m => `
+                <div class="member-card">
+                    <img src="${m.img || 'https://via.placeholder.com/150/282a36/8be9fd?text=Bandori'}" alt="${m.name}" onerror="this.src='https://via.placeholder.com/150/282a36/8be9fd?text=Bandori'">
+                    <h4>${m.name}</h4>
+                    <span>${m.role}</span>
+                    <small style="color: #6272a4;">CV: ${m.cv}</small>
+                </div>
+            `).join('');
+
+            let songsHtml = data.songs.map(s => `<li>${s}</li>`).join('');
+
+            contentPanel.innerHTML = `
+                <div class="band-info">
+                    <h2>${data.name}</h2>
+                    <p>${data.desc}</p>
+                    
+                    <div class="section-title">🔥 熱門代表歌曲</div>
+                    <ul class="songs-list">${songsHtml}</ul>
+                    
+                    <div class="section-title">👥 成員與角色陣容</div>
+                    <div class="members-grid">${membersHtml}</div>
+                </div>
+            `;
+        }
+
+        initList();
+    </script>
+</body>
+</html>
