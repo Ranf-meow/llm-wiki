@@ -1,0 +1,41 @@
+{
+  "slug": "2026-11-23-llm-synthetic-qa-critique-pipeline",
+  "phase": "completed",
+  "goal": {
+    "topic": "LLM 合成問答與 Critique 過濾管線",
+    "audience": "具基礎 ML / LLM 背景之課程同學與讀書會成員",
+    "duration_min": 20,
+    "target_slides": 11
+  },
+  "checks": {
+    "C0_coverage": "PASS",
+    "C1_outline": "PASS",
+    "C2a_slides": "PASS",
+    "C2b_coherence": "PASS",
+    "C3_render": "PASS"
+  },
+  "outline_approved": true,
+  "retries": {
+    "C1_outline": 0,
+    "C2a_slides": {},
+    "C2b_coherence": 0,
+    "C3_render": 0
+  },
+  "max_retries": 2,
+  "slide_status": {
+    "01": "passed",
+    "02": "passed",
+    "03": "passed",
+    "04": "passed",
+    "05": "passed",
+    "06": "passed",
+    "07": "passed",
+    "08": "passed",
+    "09": "passed",
+    "10": "passed",
+    "11": "passed"
+  },
+  "rendered_output": "slides/2026-11-23-llm-synthetic-qa-critique-pipeline.html",
+  "qa_report": "slides/_work/2026-11-23-llm-synthetic-qa-critique-pipeline/qa_report.md",
+  "warnings": []
+}

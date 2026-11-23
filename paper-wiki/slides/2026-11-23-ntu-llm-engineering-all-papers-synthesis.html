@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台大 LLM 工程實戰全景：從資料合成到推論減碳 — Paper LLM Wiki 綜合教學簡報</title>
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --ink: #0f172a;
+      --ink-muted: #475569;
+      --ink-subtle: #64748b;
+      --border: #e2e8f0;
+      --primary: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --teal: #0f766e;
+      --teal-soft: #f0fdfa;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --rose: #e11d48;
+      --rose-soft: #fff1f2;
+      --shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+      --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    }
+
+    [data-theme="dark"] {
+      --bg: #080d1a;
+      --surface: #111827;
+      --surface-alt: #1e293b;
+      --ink: #f1f5f9;
+      --ink-muted: #cbd5e1;
+      --ink-subtle: #94a3b8;
+      --border: #334155;
+      --primary: #60a5fa;
+      --primary-soft: rgba(59, 130, 246, 0.16);
+      --teal: #2dd4bf;
+      --teal-soft: rgba(20, 184, 166, 0.15);
+      --amber: #fbbf24;
+      --amber-soft: rgba(245, 158, 11, 0.14);
+      --rose: #fb7185;
+      --rose-soft: rgba(244, 63, 94, 0.15);
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      overflow: hidden;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    .progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      z-index: 100;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--teal));
+      width: 0%;
+      transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .deck-wrapper {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 24px 72px;
+    }
+
+    .slide {
+      display: none;
+      width: min(1220px, 100%);
+      height: min(686px, calc(100vh - 104px));
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 34px 44px 28px;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow-y: auto;
+      animation: fadeSlideIn 0.26s ease;
+    }
+    .slide.active { display: flex; }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .slide-kicker {
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 3px;
+    }
+    .slide-title {
+      font-size: 1.62rem;
+      font-weight: 800;
+      line-height: 1.24;
+      color: var(--ink);
+    }
+    .slide-badge {
+      font-size: 0.77rem;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      white-space: nowrap;
+      border: 1px solid var(--border);
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 15px;
+      min-height: 0;
+    }
+
+    .slide-footer {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.76rem;
+      color: var(--ink-subtle);
+    }
+
+    .slide.cover {
+      background: linear-gradient(135deg, #0b1120 0%, #172554 50%, #0f4c5c 100%);
+      color: #f8fafc;
+      border: none;
+      justify-content: center;
+      padding: 50px 60px;
+    }
+    .slide.cover .cover-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #93c5fd;
+      margin-bottom: 18px;
+      width: fit-content;
+    }
+    .slide.cover h1 {
+      font-size: 2.6rem;
+      font-weight: 900;
+      line-height: 1.2;
+      margin-bottom: 15px;
+      letter-spacing: -0.02em;
+    }
+    .slide.cover .cover-sub {
+      font-size: 1.13rem;
+      line-height: 1.62;
+      color: #cbd5e1;
+      max-width: 840px;
+      margin-bottom: 30px;
+    }
+    .cover-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      max-width: 920px;
+    }
+    .cover-meta-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .cover-meta-card .label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5eead4;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .cover-meta-card .val {
+      font-size: 0.9rem;
+      color: #f8fafc;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; align-items: stretch; }
+
+    .card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 15px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card.primary { border-top: 4px solid var(--primary); }
+    .card.teal { border-top: 4px solid var(--teal); }
+    .card.amber { border-top: 4px solid var(--amber); }
+    .card.rose { border-top: 4px solid var(--rose); }
+
+    .card h3 { font-size: 0.98rem; font-weight: 700; color: var(--ink); }
+    .card p, .card li { font-size: 0.87rem; line-height: 1.52; color: var(--ink-muted); }
+    .card ul { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+
+    .callout {
+      padding: 11px 16px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      line-height: 1.52;
+      border-left: 4px solid var(--primary);
+      background: var(--primary-soft);
+      color: var(--ink);
+    }
+    .callout.teal { border-left-color: var(--teal); background: var(--teal-soft); }
+    .callout.amber { border-left-color: var(--amber); background: var(--amber-soft); }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.83em;
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .stat-row { display: flex; gap: 13px; }
+    .stat-box {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      text-align: center;
+    }
+    .stat-num { font-size: 1.52rem; font-weight: 900; color: var(--primary); line-height: 1.15; }
+    .stat-num.teal { color: var(--teal); }
+    .stat-num.amber { color: var(--amber); }
+    .stat-num.rose { color: var(--rose); }
+    .stat-label { font-size: 0.75rem; color: var(--ink-subtle); margin-top: 3px; font-weight: 600; }
+
+    .chart-group { display: flex; flex-direction: column; gap: 9px; }
+    .bar-item { display: flex; flex-direction: column; gap: 3px; }
+    .bar-meta { display: flex; justify-content: space-between; font-size: 0.81rem; font-weight: 600; color: var(--ink-muted); }
+    .bar-meta strong { color: var(--ink); }
+    .bar-track { height: 13px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--ink-subtle); }
+    .bar-fill.primary { background: linear-gradient(90deg, var(--primary), #3b82f6); }
+    .bar-fill.teal { background: linear-gradient(90deg, var(--teal), #14b8a6); }
+    .bar-fill.amber { background: linear-gradient(90deg, var(--amber), #f59e0b); }
+    .bar-fill.rose { background: linear-gradient(90deg, var(--rose), #f43f5e); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { font-weight: 700; color: var(--ink); background: var(--surface-alt); }
+    td { color: var(--ink-muted); }
+    tr.highlight td { background: var(--teal-soft); color: var(--ink); font-weight: 700; }
+
+    .diagram-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 11px 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .diagram-box svg { width: 100%; height: auto; max-height: 315px; }
+
+    .controls {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 7px 14px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      z-index: 90;
+    }
+    .ctrl-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: var(--font-sans);
+    }
+    .ctrl-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .ctrl-btn.active { background: var(--primary); border-color: var(--primary); color: #ffffff; }
+    .slide-counter { font-family: var(--font-mono); font-size: 0.84rem; font-weight: 700; color: var(--ink); min-width: 64px; text-align: center; }
+
+    .notes-drawer {
+      position: fixed;
+      bottom: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(920px, calc(100vw - 32px));
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+      z-index: 95;
+      display: none;
+    }
+    .notes-drawer.open { display: block; }
+    .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.82rem; font-weight: 700; color: var(--primary); }
+    .notes-text { font-size: 0.9rem; line-height: 1.65; color: var(--ink-muted); }
+
+    .overview-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 120;
+      display: none;
+      flex-direction: column;
+      padding: 28px 36px;
+      overflow-y: auto;
+    }
+    .overview-modal.open { display: flex; }
+    .overview-top { display: flex; justify-content: space-between; align-items: center; color: #f8fafc; margin-bottom: 20px; }
+    .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+    .overview-card { background: var(--surface); border: 2px solid transparent; border-radius: 12px; padding: 15px; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+    .overview-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+    .overview-card.current { border-color: var(--teal); }
+    .overview-num { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+    .overview-title { font-size: 0.93rem; font-weight: 700; color: var(--ink); line-height: 1.4; }
+
+    @media print {
+      html, body { overflow: visible; background: #fff; }
+      .progress-track, .controls, .notes-drawer, .overview-modal { display: none !important; }
+      .deck-wrapper { display: block; height: auto; padding: 0; }
+      .slide { display: flex !important; width: 100%; height: 100vh; box-shadow: none; border: none; border-radius: 0; page-break-after: always; break-after: page; }
+    }
+
+    @media (max-width: 900px) {
+      .slide { padding: 20px 18px; height: calc(100vh - 90px); }
+      .grid-2, .grid-3, .cover-meta { grid-template-columns: 1fr; }
+      .stat-row { flex-wrap: wrap; }
+      .slide.cover h1 { font-size: 1.85rem; }
+      .slide-title { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <main class="deck-wrapper" id="deck">
+
+    <!-- SLIDE 01 -->
+    <section class="slide cover active" data-title="封面：台大 LLM 工程實戰全景（4 篇統整）" data-notes="大家好！今天這場 25 分鐘的綜合教學簡報，幫大家把 Paper LLM Wiki 收錄的四篇台大碩博論文一次打通。單篇讀容易覺得各自獨立，但串起來剛好從底層資料微調一路走到最上層的雲端綠能推論部署，完整拼出現代 LLM 系統的生命週期。先看下一頁的四層全景地圖。">
+      <div class="cover-tag">Paper LLM Wiki 全館總覽 · 4 篇台大碩博論文統整</div>
+      <h1>台大 LLM 工程實戰全景：<br/>從資料合成到推論減碳</h1>
+      <p class="cover-sub">
+        一條龍串聯<strong>吳葦誠 (2024)</strong>、<strong>吳承光 (2024)</strong>、<strong>戚得郁 (2025)</strong>與<strong>陳冠錞 (2025)</strong>，建立「資料微調 → 推理記憶 → 模型降維 → 快取能耗」的全棧 AI 系統工程直覺。
+      </p>
+      <div class="cover-meta">
+        <div class="cover-meta-card">
+          <div class="label">收錄範圍</div>
+          <div class="val">4 篇獨立台大碩博論文<br/>資工×3、土木×1（5 檔去重後）</div>
+        </div>
+        <div class="cover-meta-card">
+          <div class="label">四大工程層</div>
+          <div class="val">RAFT 微調 · ZS-DRCoT 記憶<br/>WC-SBERT · GPTCache 減碳</div>
+        </div>
+        <div class="cover-meta-card">
+          <div class="label">簡報規格</div>
+          <div class="val">Paper LLM Wiki StateGraph<br/>預計 25 分鐘 · 共 12 頁</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 02 -->
+    <section class="slide" data-title="全景地圖：四篇論文拼出 LLM 工程生命週期" data-notes="把這四篇想成蓋一棟 LLM 應用大樓的四層樓：第一層吳葦誠解決模型沒讀過內部文件的問題；第二層吳承光解決模型已有基礎知識時如何免微調自我進化；第三層戚得郁提醒別殺雞用牛刀；第四層陳冠錞盯緊生產環境的電費帳單。下一頁我們先用總表建立全局錨點。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">01 · End-to-End Lifecycle Map</div>
+          <h2 class="slide-title">四篇論文如何拼出完整 LLM 工程生命週期？</h2>
+        </div>
+        <span class="slide-badge">四層全景</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 960 255" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="四篇論文對應 LLM 工程四層生命週期圖">
+            <defs>
+              <marker id="ar1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
+              </marker>
+            </defs>
+            <rect x="14" y="20" width="212" height="162" rx="14" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2" />
+            <text x="120" y="45" text-anchor="middle" font-size="12" font-weight="800" fill="#1d4ed8">LAYER 1 · 資料與微調</text>
+            <text x="120" y="72" text-anchor="middle" font-size="15" font-weight="900" fill="#0f172a">吳葦誠 (2024)</text>
+            <text x="120" y="96" text-anchor="middle" font-size="11.5" fill="#334155">合成 Q&amp;A ＋ Critique 過濾</text>
+            <text x="120" y="116" text-anchor="middle" font-size="11.5" fill="#334155">＋ RAFT 開書微調 (QLoRA)</text>
+            <rect x="34" y="136" width="172" height="32" rx="8" fill="#1d4ed8" />
+            <text x="120" y="156" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">解：未公開封閉小語料</text>
+
+            <rect x="254" y="20" width="212" height="162" rx="14" fill="#f0fdfa" stroke="#0f766e" stroke-width="2" />
+            <text x="360" y="45" text-anchor="middle" font-size="12" font-weight="800" fill="#0f766e">LAYER 2 · 推理與記憶</text>
+            <text x="360" y="72" text-anchor="middle" font-size="15" font-weight="900" fill="#0f172a">吳承光 (2024)</text>
+            <text x="360" y="96" text-anchor="middle" font-size="11.5" fill="#334155">JSON ZS-DRCoT 思維鏈</text>
+            <text x="360" y="116" text-anchor="middle" font-size="11.5" fill="#334155">＋ O(1) 異質共享記憶庫</text>
+            <rect x="274" y="136" width="172" height="32" rx="8" fill="#0f766e" />
+            <text x="360" y="156" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">解：免微調持續自我進化</text>
+
+            <rect x="494" y="20" width="212" height="162" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2" />
+            <text x="600" y="45" text-anchor="middle" font-size="12" font-weight="800" fill="#b45309">LAYER 3 · 模型降維</text>
+            <text x="600" y="72" text-anchor="middle" font-size="15" font-weight="900" fill="#0f172a">戚得郁 (2025)</text>
+            <text x="600" y="96" text-anchor="middle" font-size="11.5" fill="#334155">維基剪枝 ＋ GPT-4o 標籤</text>
+            <text x="600" y="116" text-anchor="middle" font-size="11.5" fill="#334155">WC-SBERT vs. 本地 LLM</text>
+            <rect x="514" y="136" width="172" height="32" rx="8" fill="#d97706" />
+            <text x="600" y="156" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">解：零樣本分類高性價比</text>
+
+            <rect x="734" y="20" width="212" height="162" rx="14" fill="#fff1f2" stroke="#e11d48" stroke-width="2" />
+            <text x="840" y="45" text-anchor="middle" font-size="12" font-weight="800" fill="#be123c">LAYER 4 · 推論減碳</text>
+            <text x="840" y="72" text-anchor="middle" font-size="15" font-weight="900" fill="#0f172a">陳冠錞 (2025)</text>
+            <text x="840" y="96" text-anchor="middle" font-size="11.5" fill="#334155">GPTCache ＋ pgvector</text>
+            <text x="840" y="116" text-anchor="middle" font-size="11.5" fill="#334155">Kepler/DCGM 焦耳量測</text>
+            <rect x="754" y="136" width="172" height="32" rx="8" fill="#e11d48" />
+            <text x="840" y="156" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">解：延遲、電費與反轉點</text>
+
+            <line x1="226" y1="101" x2="250" y2="101" stroke="#64748b" stroke-width="2.2" marker-end="url(#ar1)" />
+            <line x1="466" y1="101" x2="490" y2="101" stroke="#64748b" stroke-width="2.2" marker-end="url(#ar1)" />
+            <line x1="706" y1="101" x2="730" y2="101" stroke="#64748b" stroke-width="2.2" marker-end="url(#ar1)" />
+
+            <rect x="14" y="202" width="932" height="40" rx="10" fill="#0f172a" />
+            <text x="480" y="227" text-anchor="middle" font-size="13" font-weight="700" fill="#f8fafc">貫穿全館三大主軸：異質多模型互補  ·  結構化 Schema 與領域約束  ·  反直覺實驗批判</text>
+          </svg>
+        </div>
+        <div class="callout">
+          <strong>核心命題</strong>：四篇論文橫跨醫療問答、臨床推理、新聞分類與雲端減碳，卻共同回答同一工程問題——如何在<strong>精度、成本、延遲與耗電</strong>之間取得系統級最佳平衡？
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/topics/domain-specific-llm-adaptation.md · llm-inference-efficiency-and-deployment.md</span>
+        <span>02 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 03 -->
+    <section class="slide" data-title="全覽總表：四篇論文定位、方法與代表戰績" data-notes="這張表是整場的速查地圖。請留意第三欄「是否改權重」：只有未公開封閉小語料加上 7B 小模型才真的需要 QLoRA 微調，其餘三層分別靠免微調記憶、輕量編碼器與語意快取取勝。接下來四頁逐篇拆解關鍵數據，先看第一層吳葦誠 (2024)。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">02 · Four-Paper Comparison Matrix</div>
+          <h2 class="slide-title">四篇論文定位、核心方法與代表戰績總表</h2>
+        </div>
+        <span class="slide-badge">速查總表</span>
+      </header>
+      <div class="slide-body">
+        <div class="card primary" style="padding: 12px 16px;">
+          <table>
+            <thead>
+              <tr><th>論文與層級</th><th>目標場景</th><th>改權重？</th><th>核心工程突破</th><th>代表實測戰績</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>吳葦誠 (2024)</strong> L1</td>
+                <td>繁中耳科 PDF 問答</td>
+                <td>QLoRA (r=64)</td>
+                <td>Chunk 512/0 ＋ 4 指標 Critique ＋ RAFT</td>
+                <td>Breeze F1 <strong>0.359 → 0.556</strong></td>
+              </tr>
+              <tr>
+                <td><strong>吳承光 (2024)</strong> L2</td>
+                <td>臨床問診與鑑別診斷</td>
+                <td><strong>否（純 ICL）</strong></td>
+                <td>JSON <code>ZS-DRCoT</code> ＋ O(1) 異質共享記憶</td>
+                <td>DDXPlus <strong>52.85% → 90.48%</strong></td>
+              </tr>
+              <tr>
+                <td><strong>戚得郁 (2025)</strong> L3</td>
+                <td>零樣本主題分類</td>
+                <td>僅輕量 SBERT</td>
+                <td>維基度數剪枝 ＋ GPT-4o 標籤 ＋ 單階 MNR</td>
+                <td>AG News <strong>0.847</strong>（勝全數 LLM）</td>
+              </tr>
+              <tr class="highlight">
+                <td>陳冠錞 (2025) L4</td>
+                <td>雲端 FAQ 推論節能</td>
+                <td>否（快取層）</td>
+                <td>GPTCache ＋ Kepler/DCGM 焦耳量測</td>
+                <td>0.75 省電 -43.7%｜0.85 反增 +12.7%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout teal">
+          <strong>選型洞察</strong>：四篇中唯有處理「未公開封閉語料＋小模型」才動用 QLoRA 微調；其餘三層分別以<strong>推理記憶</strong>、<strong>模型降維</strong>與<strong>推論快取</strong>大幅省下訓練或線上算力。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2024-wu-*.md · 2024-wu-ck-*.md · 2025-chi-*.md · 2025-chen-*.md</span>
+        <span>03 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 04 -->
+    <section class="slide" data-title="Layer 1：吳葦誠 (2024) 合成 Q&A ＋ Critique ＋ RAFT" data-notes="第一層聚焦吳葦誠 (2024)。右邊消融圖非常震撼：在 7B 小模型上只微調幾乎沒進步，只接 RAG 甚至因為 5 段檢索干擾而倒退；必須先用 TAIDE 生題、Breeze 嚴格審查濾出乾淨資料，再用 RAFT 開書格式訓練，F1 才從 0.359 跳升至 0.556。但如果模型本身已懂基礎醫學呢？看第二層吳承光 (2024)。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">03 · Layer 1 — Data Synthesis &amp; RAFT Fine-Tuning</div>
+          <h2 class="slide-title">吳葦誠 (2024)：封閉領域合成問答 ＋ Critique ＋ RAFT</h2>
+        </div>
+        <span class="slide-badge">改權重路線</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card primary">
+            <h3>三段工程巧思（12 份耳科 PDF / 112 頁）</h3>
+            <ul>
+              <li><strong>繁中標點 Chunking</strong>：<code>chunk=512, overlap=0</code> Top-1 命中 <code>0.6748</code>，全面勝 <code>overlap=100</code>（<code>0.5720</code>）。</li>
+              <li><strong>雙軌產題 ＋ 嚴審分工</strong>：11 題/chunk；<strong>TAIDE 生題 ＋ Breeze 嚴審</strong>（通過率 36% vs. TAIDE 84%），四指標各 ≥ 3、總分 ≥ 13。</li>
+              <li><strong>RAFT 開書微調</strong>：80%（1 正解＋4 干擾）、20%（5 干擾），以 QLoRA (<code>r=64</code>) 教小模型抗分心。</li>
+            </ul>
+          </div>
+          <div class="card teal">
+            <h3>四設定消融實驗（Table 4.9，Breeze-7B F1）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Vanilla Breeze（無微調、無 RAG）</span><strong>0.3592</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 55%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>僅 Fine-tuned（無 RAG）</span><strong>0.3608</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 56%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>僅 RAG（無微調 — 7B 分心反降！）</span><strong>0.3471 ↓</strong></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 53%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Fine-tuned ＋ RAG（RAFT 模式）</span><strong>0.5556 ★</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 86%;"></div></div>
+              </div>
+            </div>
+            <p style="margin-top:4px;font-size:0.81rem;">※ 公開基準（Llama-2）：PubMedQA <code>95.6</code>、PrivacyQA <code>66.3</code> F1。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2024-wu-llm-finetune-dataset-from-unstructured-data.md (§3–4, Tables 4.4 / 4.8 / 4.9)</span>
+        <span>04 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 05 -->
+    <section class="slide" data-title="Layer 2：吳承光 (2024) ZS-DRCoT ＋ 異質共享記憶" data-notes="同樣是 2024 醫療論文，吳承光走完全不同的免微調路線：把醫師看診邏輯寫成四欄位 JSON ZS-DRCoT，並讓三家異質模型用 Round-Robin 輪流接單、維持 O(1) 推論成本，只要答對就把推理寫進共享記憶庫讓彼此吸收專長，準確率由 52.85% 一路衝上 90.48%。接著看第三層：大規模分類連生成式 LLM 都不一定要用。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">04 · Layer 2 — Zero-Shot CoT &amp; Shared Memory</div>
+          <h2 class="slide-title">吳承光 (2024)：免微調診斷 <code>ZS-DRCoT</code> ＋ 共享記憶</h2>
+        </div>
+        <span class="slide-badge">純 ICL 路線</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card teal">
+            <h3>免微調三部曲（DDXPlus，49 種診斷）</h3>
+            <ul>
+              <li><strong>標準化病人模擬</strong>：Doctor 與 Patient LLM 自然語言互動 8 輪，量測各輪問診資訊蒐集效率。</li>
+              <li><strong>Zero-Shot JSON <code>ZS-DRCoT</code></strong>：強制輸出陽性／陰性表現、排序鑑別診斷與提問，5 模型問診均升 <strong>+5.48%</strong>。</li>
+              <li><strong>Round-Robin 共享記憶</strong>：GPT-3.5 / Gemini-1.0 / Claude-3-Haiku 輪詢（<strong>O(1) 成本</strong>），僅答對 <code>fb=1</code> 寫入 <code>bge</code> 記憶庫。</li>
+            </ul>
+          </div>
+          <div class="card primary">
+            <h3>DDXPlus 串流診斷躍升（Table 5.1，三模型均）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Non-streaming Baseline</span><strong>52.85%</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 52.9%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Non-streaming ZS-DRCoT</span><strong>58.20%</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 58.2%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Streaming Baseline + Single Memory</span><strong>70.56%</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 70.6%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Streaming ZS-DRCoT + Single Memory</span><strong>80.27%</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 80.3%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Streaming ZS-DRCoT + Multi-Agent Memory</span><strong>90.48% ★</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 90.5%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2024-wu-ck-llm-diagnostic-reasoning.md (§3–4, Tables 4.1 / 5.1)</span>
+        <span>05 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 06 -->
+    <section class="slide" data-title="Layer 3：戚得郁 (2025) WC-SBERT vs. 本地量化 LLM" data-notes="第三層來到戚得郁 (2025) 博士論文，它提醒工程師：不是所有 NLP 任務都該搬 LLM。只要洗掉維基長尾雜訊，再用 GPT-4o 依三條規則寫出描述性標籤，輕量 WC-SBERT 在完全不碰目標原文下就在 AG News 以 0.847 擊敗所有受測本地量化 LLM，而且推論只要毫秒級內積。那若任務非跑本地 LLM 不可，怎麼省電？看第四層陳冠錞 (2025)。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">05 · Layer 3 — Lightweight Encoder vs. Local Quantized LLM</div>
+          <h2 class="slide-title">戚得郁 (2025)：WC-SBERT 正面對決本地量化 LLM</h2>
+        </div>
+        <span class="slide-badge">模型降維</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card amber">
+            <h3>三大輕量工程支柱（0 筆目標原文）</h3>
+            <ul>
+              <li><strong>維基度數剪枝</strong>：中頻（<code>5≤d≤500</code>）全留、低頻 20%、高頻 2%，刪 36.7% 類別保 0.991 語意，AG News 升 <strong>+7.8%</strong>。</li>
+              <li><strong>GPT-4o 描述性標籤</strong>：統一前綴＋15–30 字＋跨類去重，DBpedia 暴增至 <strong>0.883（+23.0%）</strong>，大勝全自動 APE（0.693）。</li>
+              <li><strong>離線 <code>.npy</code> 單階段 MNR</strong>：重用 645 萬篇 Wiki 摘要，單次微調取代多輪迭代。</li>
+            </ul>
+          </div>
+          <div class="card teal">
+            <h3>Table 5.19 基準對決（AG News / DBpedia 最佳）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>WC-SBERT（輕量 Encoder）</span><strong>AG 0.847 ★ ｜ DB 0.886</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 84.7%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gemma 2（Ollama 本地量化 FS）</span><strong>AG 0.832 ｜ DB 0.915 ★</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 83.2%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.1（Ollama FS）</span><strong>AG 0.680 ｜ DB 0.761</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 68.0%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>GPT-4o mini（API FS）</span><strong>AG 0.655 ｜ DB 0.841</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 65.5%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.2（Ollama FS — 量化掉點）</span><strong>AG 0.601 ｜ DB 0.649</strong></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 60.1%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§3–4, Tables 5.6 / 5.13 / 5.19)</span>
+        <span>06 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 07 -->
+    <section class="slide" data-title="Layer 4：陳冠錞 (2025) 語意快取與效益反轉點" data-notes="第四層盯緊線上能耗帳。陳冠錞在 GKE T4 以 Kepler 加 DCGM 量測整機焦耳數，畫出這條震撼曲線：閾值 0.75 因 99.99% 請求在 CPU 快取層截殺，總耗電大降 43.7%；但只要收嚴到 0.85，就算命中率還有 87.3%，剩下 Miss 承受 CPU 查表失敗加 GPU 推論雙重懲罰，反超無快取 12.7%！講完四篇各自核心，接下來往上抽象跨論文共通法則。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">06 · Layer 4 — Semantic Caching &amp; Energy Trade-Off</div>
+          <h2 class="slide-title">陳冠錞 (2025)：語意快取非線性能耗與 <code>0.85</code> 效益反轉點</h2>
+        </div>
+        <span class="slide-badge">推論減碳</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 920 205" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="語意快取相似度閾值與整機總能耗反轉曲線">
+            <rect x="70" y="18" width="820" height="47" fill="rgba(225,29,72,0.08)" />
+            <rect x="70" y="65" width="820" height="100" fill="rgba(15,118,110,0.07)" />
+
+            <line x1="70" y1="65" x2="890" y2="65" stroke="#64748b" stroke-width="1.8" stroke-dasharray="7 5" />
+            <text x="884" y="57" text-anchor="end" font-size="11.5" font-weight="800" fill="#475569">無快取 Baseline：93.3 kJ (155.9 W)</text>
+
+            <line x1="70" y1="165" x2="890" y2="165" stroke="#475569" stroke-width="1.8" />
+            <line x1="70" y1="18" x2="70" y2="165" stroke="#475569" stroke-width="1.8" />
+
+            <polyline points="145,137 285,139 425,101 565,43 705,44 845,46" fill="none" stroke="#1d4ed8" stroke-width="3.2" />
+
+            <circle cx="145" cy="137" r="6" fill="#0f766e" />
+            <circle cx="285" cy="139" r="7.5" fill="#0f766e" stroke="#ffffff" stroke-width="2" />
+            <circle cx="425" cy="101" r="6" fill="#d97706" />
+            <circle cx="565" cy="43" r="8" fill="#e11d48" stroke="#ffffff" stroke-width="2" />
+            <circle cx="705" cy="44" r="6" fill="#e11d48" />
+            <circle cx="845" cy="46" r="6" fill="#e11d48" />
+
+            <text x="145" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">53.3 kJ</text>
+            <text x="285" y="158" text-anchor="middle" font-size="11.5" font-weight="800" fill="#0f766e">52.5 kJ (-43.7% 最佳)</text>
+            <text x="425" y="90" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">73.5 kJ (+21kJ)</text>
+            <text x="565" y="30" text-anchor="middle" font-size="12" font-weight="900" fill="#be123c">105.1 kJ (+12.7% 反轉峰值!)</text>
+            <text x="705" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">104.7 kJ</text>
+            <text x="845" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">103.4 kJ</text>
+
+            <text x="145" y="186" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">0.70</text>
+            <text x="285" y="186" text-anchor="middle" font-size="12" font-weight="800" fill="#0f766e">0.75</text>
+            <text x="425" y="186" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">0.80</text>
+            <text x="565" y="186" text-anchor="middle" font-size="12" font-weight="800" fill="#be123c">0.85</text>
+            <text x="705" y="186" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">0.90</text>
+            <text x="845" y="186" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">0.95</text>
+            <text x="45" y="96" text-anchor="middle" font-size="11" font-weight="700" fill="#475569" transform="rotate(-90 45 96)">10 分鐘總能耗 (kJ)</text>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num teal">108 ms</div>
+            <div class="stat-label">0.75 延遲（快 Baseline 280×）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num teal">-43.7%</div>
+            <div class="stat-label">0.75 CPU 卸載省電（Hit 99.99%）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num rose">+12.7%</div>
+            <div class="stat-label">0.85 雙重懲罰（Hit 87.3%）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">175.2 W</div>
+            <div class="stat-label">GKE T4 寄生開銷峰值功率</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chen-semantic-caching-energy-tradeoff.md (§4, Table 4.1) · semantic-caching-and-benefit-inversion.md</span>
+        <span>07 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 08 -->
+    <section class="slide" data-title="跨論文法則一：低成本的異質多模型互補紅利" data-notes="把四篇擺在一起讀，第一個立刻浮現的跨論文規律就是「異質多模型互補」。吳葦誠離線把 TAIDE 和 Breeze 配對，線上只跑單一 7B；吳承光線上用 Round-Robin 讓三家 LLM 輪流接單並共享答對記憶，只花 O(1) 推論成本卻繼承三家專長。這比同時叫多個模型即時投票務實得多！接著看第二條共通法則。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">07 · Cross-Paper Principle 1</div>
+          <h2 class="slide-title">跨論文法則一：低成本的「異質多模型互補紅利」</h2>
+        </div>
+        <span class="slide-badge">免費效能紅利</span>
+      </header>
+      <div class="slide-body">
+        <div class="card primary" style="padding: 12px 16px;">
+          <table>
+            <thead>
+              <tr><th>協作範式</th><th>代表論文</th><th>模型混搭方式</th><th>實測互補證據</th><th>線上額外成本</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>離線管線分工</strong></td>
+                <td>吳葦誠 (2024)</td>
+                <td><code>TAIDE-8B</code> 生題 ＋ <code>Breeze-7B</code> 嚴審作答</td>
+                <td>Breeze 嚴審（36% vs 84%）→ F1 <strong>0.5556</strong> 勝全 TAIDE / 全 Breeze</td>
+                <td><strong>0</strong>（單一 7B 推論）</td>
+              </tr>
+              <tr class="highlight">
+                <td>線上輪詢共享記憶</td>
+                <td>吳承光 (2024)</td>
+                <td><code>GPT-3.5</code> ＋ <code>Gemini-1.0</code> ＋ <code>Claude-3</code> 輪詢</td>
+                <td>三家互補專長疾病 → 單模均 80.27% 躍升 <strong>90.48%</strong></td>
+                <td><strong>O(1)</strong>（免 O(K) 辯論）</td>
+              </tr>
+              <tr>
+                <td><strong>大小模型路由</strong></td>
+                <td>戚得郁 (2025) 延伸</td>
+                <td>輕量 <code>WC-SBERT</code> ＋ 本地 <code>Gemma 2</code></td>
+                <td>高信心樣本秒回，僅低 Margin 邊界交 LLM 複核</td>
+                <td>大減 LLM 呼叫量</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout teal">
+          <strong>統一洞見</strong>：單一模型自產自審或自我記憶容易陷入同溫層盲點；透過<strong>離線角色分工</strong>或<strong>線上輪詢共享記憶</strong>，無需昂貴即時投票即可穩定萃取多樣性紅利。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/concepts/heterogeneous-multi-llm-collaboration.md · 2024-wu-*.md · 2024-wu-ck-*.md</span>
+        <span>08 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 09 -->
+    <section class="slide" data-title="跨論文法則二：結構化 Schema 與領域約束勝過黑箱自動" data-notes="第二條貫穿全館的鐵律是：別迷信「全自動」或「預設超參數」。明確鎖定 JSON 或評分 Schema 能讓小模型穩定輸出；人工寫好三條約束引導 GPT-4o 產標籤大勝全自動 APE 超過 14 個百分點；把大家習慣開著的 overlap 關成 0 反而贏了 10 個百分點。下一頁把四篇的批判盲區一次攤開複盤。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">08 · Cross-Paper Principle 2</div>
+          <h2 class="slide-title">跨論文法則二：結構化 Schema 與領域約束勝過黑箱自動</h2>
+        </div>
+        <span class="slide-badge">工程紀律</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card primary">
+            <h3>① 輸出 Schema 強制鎖定</h3>
+            <p>吳葦誠鎖定 <code>評分:/評估:</code>（重試率僅 0.16%）；吳承光採四欄位 JSON；戚得郁以 <code>T=0</code> ＋ <code>{"label": int}</code> 杜絕廢話。</p>
+          </div>
+          <div class="card teal">
+            <h3>② 人工約束 ＞ 全自動黑箱</h3>
+            <p>戚得郁實測三規則引導 GPT-4o 產標籤（<code>0.836</code>），大勝無約束全自動 APE（<code>0.693</code>）達 <strong>14.3 個百分點</strong>。</p>
+          </div>
+          <div class="card amber">
+            <h3>③ 預設超參數不可盲信</h3>
+            <p>陳冠錞證實快取閾值 0.85 反致耗電上升；吳葦誠實測 <code>overlap=0</code> 反勝常見預設 <code>overlap=100</code>。</p>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">0.16%</div>
+            <div class="stat-label">Breeze 嚴格格式重試率</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num teal">+14.3 pp</div>
+            <div class="stat-label">人工約束標籤勝全自動 APE</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">+10.3 pp</div>
+            <div class="stat-label">Chunk overlap=0 勝 overlap=100</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/topics/domain-specific-llm-adaptation.md (§3) · 2025-chi-*.md · 2024-wu-*.md</span>
+        <span>09 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 10 -->
+    <section class="slide" data-title="批判性閱讀總複盤：四篇論文的陷阱與實驗盲區" data-notes="這頁是我最希望大家帶走的批判肌肉。復現吳葦誠要記得把 Answer 加進 Groundedness Prompt；套用吳承光要小心高歧義問題的負遷移與即時標籤假設；導入戚得郁先用剪枝加 GPT 標籤就能拿九成紅利；落地陳冠錞務必補上非重複負例與答錯率監控。那四篇合體互補會長成什麼系統？看下一頁。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">09 · Cross-Paper Critical Review</div>
+          <h2 class="slide-title">批判性閱讀總複盤：四篇論文各自藏著哪些陷阱與盲區？</h2>
+        </div>
+        <span class="slide-badge">落地避坑</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card primary">
+            <h3>吳葦誠 (2024) · 審查漏看 Answer</h3>
+            <p>附錄 Groundedness Prompt 只餵 <code>Q+Context</code> 未審 <code>Answer</code>；加拒答樣本令正例 F1 跌至 <code>0.418</code>；缺人工幻覺評分表。</p>
+          </div>
+          <div class="card teal">
+            <h3>吳承光 (2024) · 負遷移與即時標籤</h3>
+            <p>「呼吸困難」主訴下 <code>ZS-DRCoT</code> 倒退 <strong>-2.20%</strong>（Llama3 <code>-10.5%</code>）；串流記憶假設每次看診結束皆可即時取得黃金標籤。</p>
+          </div>
+          <div class="card amber">
+            <h3>戚得郁 (2025) · 邊際增益與規格缺漏</h3>
+            <p>Stage 2 僅微增 <code>+0.3%</code>～<code>+1.3%</code>；Table 5.19 漏標參數量、量化後綴與實測延遲；<code>Building→Village</code> 誤判 3,599 筆。</p>
+          </div>
+          <div class="card rose">
+            <h3>陳冠錞 (2025) · 壓測無負例與勘誤</h3>
+            <p>QQP 100% 為重複問句且未量答錯率；摘要誤將 <code>105.1 kJ</code> 標成 <code>0.95</code>（實測表為 <code>0.85</code>）；未算每請求焦耳數。</p>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num rose">-2.20%</div>
+            <div class="stat-label">高歧義主訴 CoT 負遷移</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">+0.3%</div>
+            <div class="stat-label">DBpedia Stage 2 邊際增益</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num">100% 重複</div>
+            <div class="stat-label">QQP 壓測缺非重複負例與正確率</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：四篇 wiki/papers/*.md (§5 批判性閱讀觀察)</span>
+        <span>10 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 11 -->
+    <section class="slide" data-title="終極整合藍圖：四篇合體的混合 LLM 系統架構" data-notes="這張圖展現建立 Paper LLM Wiki 最大的複利價值：請求進來先過 WC-SBERT，純分類高信心直接秒回；需要生成的先過依風險分級的動態閾值語意快取安全省電；真正打穿快取的難題，再依未公開小語料走 RAFT 專家小模型，或走 ZS-DRCoT 異質共享記憶並搭配 Critique 把關。最後一頁收斂成選型清單與討論題。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">10 · Unified Hybrid System Blueprint</div>
+          <h2 class="slide-title">四篇合體！下一代高準確、低成本、綠能混合 LLM 架構</h2>
+        </div>
+        <span class="slide-badge">跨論文融合</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 960 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="四篇論文融合之企業級混合 LLM 系統架構藍圖">
+            <defs>
+              <marker id="ar3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+              </marker>
+            </defs>
+            <rect x="14" y="88" width="126" height="66" rx="12" fill="#0f172a" />
+            <text x="77" y="117" text-anchor="middle" font-size="13" font-weight="800" fill="#ffffff">線上使用者</text>
+            <text x="77" y="137" text-anchor="middle" font-size="11" fill="#cbd5e1">查詢 / 分類請求</text>
+
+            <rect x="172" y="64" width="194" height="114" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2" />
+            <text x="269" y="88" text-anchor="middle" font-size="11.5" font-weight="800" fill="#b45309">閘道一 · 戚得郁 (2025)</text>
+            <text x="269" y="112" text-anchor="middle" font-size="13.5" font-weight="800" fill="#0f172a">WC-SBERT 前置路由</text>
+            <text x="269" y="133" text-anchor="middle" font-size="11" fill="#475569">意圖分類 ＋ 風險定級</text>
+            <text x="269" y="154" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f766e">高信心純分類 → 毫秒秒回!</text>
+
+            <rect x="404" y="64" width="214" height="114" rx="14" fill="#fff1f2" stroke="#e11d48" stroke-width="2" />
+            <text x="511" y="88" text-anchor="middle" font-size="11.5" font-weight="800" fill="#be123c">閘道二 · 陳冠錞 (2025)</text>
+            <text x="511" y="112" text-anchor="middle" font-size="13.5" font-weight="800" fill="#0f172a">差異化閾值 GPTCache</text>
+            <text x="511" y="133" text-anchor="middle" font-size="11" fill="#475569">FAQ 寬省電 / 醫療嚴防錯</text>
+            <text x="511" y="154" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f766e">Hit → CPU 卸載 ~108ms (-43.7%)</text>
+
+            <rect x="664" y="18" width="282" height="92" rx="13" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2" />
+            <text x="805" y="42" text-anchor="middle" font-size="11.5" font-weight="800" fill="#1d4ed8">專家引擎 A · 吳葦誠 (2024)</text>
+            <text x="805" y="66" text-anchor="middle" font-size="13" font-weight="800" fill="#0f172a">RAFT 微調專家小模型 (7B)</text>
+            <text x="805" y="88" text-anchor="middle" font-size="11" fill="#475569">未公開封閉文件問答（抗檢索分心）</text>
+
+            <rect x="664" y="136" width="282" height="96" rx="13" fill="#f0fdfa" stroke="#0f766e" stroke-width="2" />
+            <text x="805" y="160" text-anchor="middle" font-size="11.5" font-weight="800" fill="#0f766e">專家引擎 B · 吳承光 (2024)</text>
+            <text x="805" y="184" text-anchor="middle" font-size="13" font-weight="800" fill="#0f172a">ZS-DRCoT ＋ O(1) 異質共享記憶</text>
+            <text x="805" y="206" text-anchor="middle" font-size="11" fill="#475569">複雜多輪推理（結合 Critique 審查寫回）</text>
+
+            <line x1="140" y1="121" x2="168" y2="121" stroke="#475569" stroke-width="2.2" marker-end="url(#ar3)" />
+            <line x1="366" y1="121" x2="400" y2="121" stroke="#475569" stroke-width="2.2" marker-end="url(#ar3)" />
+            <path d="M 618 102 L 640 102 L 640 64 L 660 64" fill="none" stroke="#1d4ed8" stroke-width="2" marker-end="url(#ar3)" />
+            <path d="M 618 140 L 640 140 L 640 184 L 660 184" fill="none" stroke="#0f766e" stroke-width="2" marker-end="url(#ar3)" />
+
+            <text x="511" y="218" text-anchor="middle" font-size="11.5" font-weight="700" fill="#475569">底層常駐觀測：Kepler (CPU/DRAM) ＋ DCGM (GPU) 動態避開效益反轉點</text>
+          </svg>
+        </div>
+        <div class="callout teal">
+          <strong>跨論文互補閉環</strong>：戚得郁補齊快取前意圖分級；陳冠錞補齊系統延遲與耗電監控；吳葦誠的 Critique 審查正好協助解除吳承光對即時黃金標籤 <code>fb_t</code> 的依賴！
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/topics/domain-specific-llm-adaptation.md (§4) · llm-inference-efficiency-and-deployment.md (§3)</span>
+        <span>11 / 12</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 12 -->
+    <section class="slide" data-title="總結與討論：實戰選型清單與跨論文 Q&A" data-notes="最後用一分半鐘收尾。這四篇台大論文涵蓋了從資料合成、免微調推理、模型降維到雲端減碳的完整光譜。下次規劃 AI 系統時，拿左邊四條檢查表逐一過濾——先降維、再判斷是否改權重、善用異質互補、上線盯緊反轉點。現在歡迎針對右邊三道跨論文融合題展開討論！">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">11 · Decision Checklist &amp; Reading-Group Q&amp;A</div>
+          <h2 class="slide-title">工程選型決策清單與跨論文讀書會討論題</h2>
+        </div>
+        <span class="slide-badge">總結與思辨</span>
+      </header>
+      <div class="slide-body">
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">0.556</div>
+            <div class="stat-label">RAFT 突破 7B 純 RAG 瓶頸</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num teal">90.48%</div>
+            <div class="stat-label">O(1) 異質共享記憶準確率</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">0.847</div>
+            <div class="stat-label">WC-SBERT AG News 奪冠</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num rose">-43.7%</div>
+            <div class="stat-label">0.75 省電（0.85 反增 +12.7%）</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card teal">
+            <h3>四步實戰選型 Checklist</h3>
+            <ul>
+              <li><strong>結構化主題分類？</strong> 先上 <strong>WC-SBERT ＋ GPT-4o 標籤</strong>，別急著燒 LLM。</li>
+              <li><strong>未公開封閉小語料？</strong> 用 <strong>Critique 過濾 ＋ RAFT 微調</strong>，避開小模型純 RAG 分心。</li>
+              <li><strong>模型已有基礎知識需推理？</strong> 上 <strong>JSON CoT ＋ O(1) 共享記憶</strong>，免改權重。</li>
+              <li><strong>高重複線上推論？</strong> 裝 <strong>語意快取並監控 Hit Rate／功耗</strong>，嚴防反轉點。</li>
+            </ul>
+          </div>
+          <div class="card primary">
+            <h3>跨論文讀書會討論題（Q&amp;A）</h3>
+            <ul>
+              <li><strong>Q1（記憶 vs. 微調）</strong>：把吳承光的共享記憶庫套在吳葦誠的耳科問答，能否取代 QLoRA 微調？</li>
+              <li><strong>Q2（自動審查補回饋）</strong>：沒有即時標籤 <code>fb_t</code> 時，能否用吳葦誠的 Critique LLM 把關記憶寫入？</li>
+              <li><strong>Q3（精度與綠能三角）</strong>：在陳冠錞快取補上答錯率並用 WC-SBERT 分流閾值，最佳操作點在哪？</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>Paper LLM Wiki 全館索引：wiki/index.md｜快捷鍵：←/→ · N 筆記 · O 全覽 · F 全螢幕</span>
+        <span>12 / 12</span>
+      </footer>
+    </section>
+
+  </main>
+
+  <aside class="notes-drawer" id="notesDrawer" aria-live="polite">
+    <div class="notes-header">
+      <span>講者筆記（Speaker Notes）</span>
+      <button class="ctrl-btn" id="closeNotesBtn" type="button">關閉 (N)</button>
+    </div>
+    <p class="notes-text" id="notesText"></p>
+  </aside>
+
+  <div class="overview-modal" id="overviewModal" role="dialog" aria-modal="true" aria-label="投影片全覽">
+    <div class="overview-top">
+      <h2 style="font-size: 1.25rem;">投影片全覽（點擊跳轉）</h2>
+      <button class="ctrl-btn" id="closeOverviewBtn" type="button">關閉 (Esc / O)</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <nav class="controls" aria-label="簡報控制列">
+    <button class="ctrl-btn" id="prevBtn" type="button" title="上一頁 (←)">← 上一頁</button>
+    <span class="slide-counter" id="slideCounter">01 / 12</span>
+    <button class="ctrl-btn" id="nextBtn" type="button" title="下一頁 (→)">下一頁 →</button>
+    <button class="ctrl-btn" id="notesBtn" type="button" title="切換講者筆記 (N)">筆記</button>
+    <button class="ctrl-btn" id="overviewBtn" type="button" title="投影片全覽 (O)">全覽</button>
+    <button class="ctrl-btn" id="themeBtn" type="button" title="切換深淺主題">深色</button>
+    <button class="ctrl-btn" id="printBtn" type="button" title="列印或匯出 PDF">匯出 PDF</button>
+  </nav>
+
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const progressFill = document.getElementById('progressFill');
+      const slideCounter = document.getElementById('slideCounter');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const notesBtn = document.getElementById('notesBtn');
+      const closeNotesBtn = document.getElementById('closeNotesBtn');
+      const notesDrawer = document.getElementById('notesDrawer');
+      const notesText = document.getElementById('notesText');
+      const overviewBtn = document.getElementById('overviewBtn');
+      const closeOverviewBtn = document.getElementById('closeOverviewBtn');
+      const overviewModal = document.getElementById('overviewModal');
+      const overviewGrid = document.getElementById('overviewGrid');
+      const themeBtn = document.getElementById('themeBtn');
+      const printBtn = document.getElementById('printBtn');
+
+      let current = 0;
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function renderOverview() {
+        overviewGrid.innerHTML = '';
+        slides.forEach((slide, idx) => {
+          const card = document.createElement('div');
+          card.className = 'overview-card' + (idx === current ? ' current' : '');
+          card.innerHTML =
+            '<div class="overview-num">SLIDE ' + pad(idx + 1) + '</div>' +
+            '<div class="overview-title">' + (slide.dataset.title || ('Slide ' + (idx + 1))) + '</div>';
+          card.addEventListener('click', () => {
+            goTo(idx);
+            overviewModal.classList.remove('open');
+          });
+          overviewGrid.appendChild(card);
+        });
+      }
+
+      function goTo(index) {
+        if (index < 0) index = 0;
+        if (index >= slides.length) index = slides.length - 1;
+        slides[current].classList.remove('active');
+        current = index;
+        slides[current].classList.add('active');
+        slideCounter.textContent = pad(current + 1) + ' / ' + pad(slides.length);
+        progressFill.style.width = ((current + 1) / slides.length * 100) + '%';
+        notesText.textContent = slides[current].dataset.notes || '本頁無額外講者筆記。';
+        history.replaceState(null, '', '#slide-' + (current + 1));
+        if (overviewModal.classList.contains('open')) renderOverview();
+      }
+
+      function toggleNotes() {
+        const isOpen = notesDrawer.classList.toggle('open');
+        notesBtn.classList.toggle('active', isOpen);
+      }
+
+      function toggleOverview() {
+        const isOpen = overviewModal.classList.toggle('open');
+        if (isOpen) renderOverview();
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+          document.documentElement.removeAttribute('data-theme');
+          themeBtn.textContent = '深色';
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          themeBtn.textContent = '淺色';
+        }
+      }
+
+      prevBtn.addEventListener('click', () => goTo(current - 1));
+      nextBtn.addEventListener('click', () => goTo(current + 1));
+      notesBtn.addEventListener('click', toggleNotes);
+      closeNotesBtn.addEventListener('click', toggleNotes);
+      overviewBtn.addEventListener('click', toggleOverview);
+      closeOverviewBtn.addEventListener('click', toggleOverview);
+      themeBtn.addEventListener('click', toggleTheme);
+      printBtn.addEventListener('click', () => window.print());
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          if (!overviewModal.classList.contains('open')) { e.preventDefault(); goTo(current + 1); }
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          if (!overviewModal.classList.contains('open')) { e.preventDefault(); goTo(current - 1); }
+        } else if (e.key === 'Home') { goTo(0); }
+        else if (e.key === 'End') { goTo(slides.length - 1); }
+        else if (e.key.toLowerCase() === 'n') { toggleNotes(); }
+        else if (e.key.toLowerCase() === 'o') { toggleOverview(); }
+        else if (e.key === 'Escape') {
+          overviewModal.classList.remove('open');
+          notesDrawer.classList.remove('open');
+          notesBtn.classList.remove('active');
+        } else if (e.key.toLowerCase() === 'f') {
+          if (!document.fullscreenElement) { document.documentElement.requestFullscreen?.(); }
+          else { document.exitFullscreen?.(); }
+        }
+      });
+
+      let touchStartX = 0;
+      document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+      document.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].screenX - touchStartX;
+        if (dx < -50) goTo(current + 1);
+        if (dx > 50) goTo(current - 1);
+      }, { passive: true });
+
+      const match = window.location.hash.match(/^#slide-(\d+)$/);
+      goTo(match ? parseInt(match[1], 10) - 1 : 0);
+    })();
+  </script>
+</body>
+</html>

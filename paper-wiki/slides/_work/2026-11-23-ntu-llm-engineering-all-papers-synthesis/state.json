@@ -1,0 +1,42 @@
+{
+  "slug": "2026-11-23-ntu-llm-engineering-all-papers-synthesis",
+  "phase": "completed",
+  "goal": {
+    "topic": "台大 LLM 工程實戰全景：從資料合成微調、診斷推理到推論降本減碳（全館 4 篇獨立論文統整）",
+    "audience": "課程學習者與讀書會成員（教學型、全棧工程與批判閱讀）",
+    "duration_min": 25,
+    "target_slides": 12
+  },
+  "outline_approved": true,
+  "checks": {
+    "C0_coverage": "PASS",
+    "C1_outline": "PASS",
+    "C2a_all_slides": "PASS",
+    "C2b_coherence": "PASS",
+    "C3_static_qa": "PASS"
+  },
+  "retries": {
+    "C1_outline": 0,
+    "C2a_slides": {},
+    "C2b_coherence": 0,
+    "C3_render": 0
+  },
+  "max_retries": 2,
+  "slide_status": {
+    "01": "done",
+    "02": "done",
+    "03": "done",
+    "04": "done",
+    "05": "done",
+    "06": "done",
+    "07": "done",
+    "08": "done",
+    "09": "done",
+    "10": "done",
+    "11": "done",
+    "12": "done"
+  },
+  "warnings": [
+    "去重紀錄：使用者共上傳 5 份 PDF，其中 ntu-112-2_(1).pdf 與 ntu-112-2_(2).pdf 經 SHA256 驗證完全相同（吳承光 2024），本簡報經使用者核准統整全館 4 篇獨立論文。"
+  ]
+}

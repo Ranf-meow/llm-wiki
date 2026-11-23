@@ -1,0 +1,39 @@
+{
+  "slug": "2026-11-23-zero-shot-topic-classification-wc-sbert-vs-llm",
+  "phase": "completed",
+  "goal": {
+    "topic": "零樣本主題分類：WC-SBERT vs. 本地量化 LLM（戚得郁, 2025 教學精讀）",
+    "audience": "課程學習者與讀書會成員（教學型、偏工程實作與批判閱讀）",
+    "duration_min": 20,
+    "target_slides": 11
+  },
+  "outline_approved": true,
+  "checks": {
+    "C0_coverage": "PASS",
+    "C1_outline": "PASS",
+    "C2a_all_slides": "PASS",
+    "C2b_coherence": "PASS",
+    "C3_static_qa": "PASS"
+  },
+  "retries": {
+    "C1_outline": 0,
+    "C2a_slides": {},
+    "C2b_coherence": 0,
+    "C3_render": 0
+  },
+  "max_retries": 2,
+  "slide_status": {
+    "01": "done",
+    "02": "done",
+    "03": "done",
+    "04": "done",
+    "05": "done",
+    "06": "done",
+    "07": "done",
+    "08": "done",
+    "09": "done",
+    "10": "done",
+    "11": "done"
+  },
+  "warnings": []
+}

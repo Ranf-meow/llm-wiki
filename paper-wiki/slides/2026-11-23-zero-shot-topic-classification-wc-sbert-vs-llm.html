@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>零樣本主題分類：WC-SBERT vs. 本地量化 LLM — Paper LLM Wiki 教學簡報</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --ink: #0f172a;
+      --ink-muted: #475569;
+      --ink-subtle: #64748b;
+      --border: #e2e8f0;
+      --primary: #0f766e;
+      --primary-soft: #f0fdfa;
+      --indigo: #4338ca;
+      --indigo-soft: #eef2ff;
+      --teal: #0d9488;
+      --teal-soft: #ccfbf1;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --rose: #e11d48;
+      --rose-soft: #fff1f2;
+      --shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+      --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    }
+
+    [data-theme="dark"] {
+      --bg: #090e1a;
+      --surface: #111827;
+      --surface-alt: #1e293b;
+      --ink: #f1f5f9;
+      --ink-muted: #cbd5e1;
+      --ink-subtle: #94a3b8;
+      --border: #334155;
+      --primary: #2dd4bf;
+      --primary-soft: rgba(45, 212, 191, 0.14);
+      --indigo: #818cf8;
+      --indigo-soft: rgba(99, 102, 241, 0.16);
+      --teal: #5eead4;
+      --teal-soft: rgba(20, 184, 166, 0.16);
+      --amber: #fbbf24;
+      --amber-soft: rgba(245, 158, 11, 0.14);
+      --rose: #fb7185;
+      --rose-soft: rgba(244, 63, 94, 0.15);
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      overflow: hidden;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    .progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      z-index: 100;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--indigo));
+      width: 0%;
+      transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .deck-wrapper {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 24px 72px;
+    }
+
+    .slide {
+      display: none;
+      width: min(1220px, 100%);
+      height: min(686px, calc(100vh - 104px));
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 36px 46px 30px;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow-y: auto;
+      animation: fadeSlideIn 0.26s ease;
+    }
+    .slide.active { display: flex; }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 11px;
+    }
+    .slide-kicker {
+      font-size: 0.77rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .slide-title {
+      font-size: 1.66rem;
+      font-weight: 800;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+    .slide-badge {
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      white-space: nowrap;
+      border: 1px solid var(--border);
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .slide-footer {
+      margin-top: 12px;
+      padding-top: 9px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.77rem;
+      color: var(--ink-subtle);
+    }
+
+    .slide.cover {
+      background: linear-gradient(135deg, #0b132b 0%, #113946 52%, #1e1b4b 100%);
+      color: #f8fafc;
+      border: none;
+      justify-content: center;
+      padding: 52px 62px;
+    }
+    .slide.cover .cover-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #99f6e4;
+      margin-bottom: 20px;
+      width: fit-content;
+    }
+    .slide.cover h1 {
+      font-size: 2.65rem;
+      font-weight: 900;
+      line-height: 1.2;
+      margin-bottom: 15px;
+      letter-spacing: -0.02em;
+    }
+    .slide.cover .cover-sub {
+      font-size: 1.16rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      max-width: 820px;
+      margin-bottom: 32px;
+    }
+    .cover-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      max-width: 900px;
+    }
+    .cover-meta-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .cover-meta-card .label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5eead4;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .cover-meta-card .val {
+      font-size: 0.92rem;
+      color: #f8fafc;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+
+    .card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .card.primary { border-top: 4px solid var(--indigo); }
+    .card.teal { border-top: 4px solid var(--primary); }
+    .card.amber { border-top: 4px solid var(--amber); }
+    .card.rose { border-top: 4px solid var(--rose); }
+
+    .card h3 { font-size: 1rem; font-weight: 700; color: var(--ink); }
+    .card p, .card li { font-size: 0.89rem; line-height: 1.55; color: var(--ink-muted); }
+    .card ul { padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+
+    .callout {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.89rem;
+      line-height: 1.55;
+      border-left: 4px solid var(--indigo);
+      background: var(--indigo-soft);
+      color: var(--ink);
+    }
+    .callout.teal { border-left-color: var(--primary); background: var(--primary-soft); }
+    .callout.amber { border-left-color: var(--amber); background: var(--amber-soft); }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.84em;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--indigo-soft);
+      color: var(--indigo);
+      font-weight: 600;
+    }
+
+    .stat-row { display: flex; gap: 14px; }
+    .stat-box {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .stat-num { font-size: 1.62rem; font-weight: 900; color: var(--primary); line-height: 1.15; }
+    .stat-num.indigo { color: var(--indigo); }
+    .stat-num.amber { color: var(--amber); }
+    .stat-num.rose { color: var(--rose); }
+    .stat-label { font-size: 0.77rem; color: var(--ink-subtle); margin-top: 4px; font-weight: 600; }
+
+    .chart-group { display: flex; flex-direction: column; gap: 9px; }
+    .bar-item { display: flex; flex-direction: column; gap: 3px; }
+    .bar-meta { display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; color: var(--ink-muted); }
+    .bar-meta strong { color: var(--ink); }
+    .bar-track { height: 13px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--ink-subtle); }
+    .bar-fill.primary { background: linear-gradient(90deg, var(--indigo), #6366f1); }
+    .bar-fill.teal { background: linear-gradient(90deg, var(--primary), #14b8a6); }
+    .bar-fill.amber { background: linear-gradient(90deg, var(--amber), #f59e0b); }
+    .bar-fill.rose { background: linear-gradient(90deg, var(--rose), #f43f5e); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 9px 11px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { font-weight: 700; color: var(--ink); background: var(--surface-alt); }
+    td { color: var(--ink-muted); }
+    tr.highlight td { background: var(--primary-soft); color: var(--ink); font-weight: 700; }
+    tr.warn td { background: var(--rose-soft); color: var(--ink); }
+
+    .diagram-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .diagram-box svg { width: 100%; height: auto; max-height: 310px; }
+
+    .controls {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 7px 14px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      z-index: 90;
+    }
+    .ctrl-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: var(--font-sans);
+    }
+    .ctrl-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .ctrl-btn.active { background: var(--primary); border-color: var(--primary); color: #ffffff; }
+    .slide-counter { font-family: var(--font-mono); font-size: 0.84rem; font-weight: 700; color: var(--ink); min-width: 64px; text-align: center; }
+
+    .notes-drawer {
+      position: fixed;
+      bottom: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(920px, calc(100vw - 32px));
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+      z-index: 95;
+      display: none;
+    }
+    .notes-drawer.open { display: block; }
+    .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.82rem; font-weight: 700; color: var(--primary); }
+    .notes-text { font-size: 0.9rem; line-height: 1.65; color: var(--ink-muted); }
+
+    .overview-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 120;
+      display: none;
+      flex-direction: column;
+      padding: 28px 36px;
+      overflow-y: auto;
+    }
+    .overview-modal.open { display: flex; }
+    .overview-top { display: flex; justify-content: space-between; align-items: center; color: #f8fafc; margin-bottom: 20px; }
+    .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .overview-card { background: var(--surface); border: 2px solid transparent; border-radius: 12px; padding: 16px; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+    .overview-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+    .overview-card.current { border-color: var(--indigo); }
+    .overview-num { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+    .overview-title { font-size: 0.95rem; font-weight: 700; color: var(--ink); line-height: 1.4; }
+
+    @media print {
+      html, body { overflow: visible; background: #fff; }
+      .progress-track, .controls, .notes-drawer, .overview-modal { display: none !important; }
+      .deck-wrapper { display: block; height: auto; padding: 0; }
+      .slide { display: flex !important; width: 100%; height: 100vh; box-shadow: none; border: none; border-radius: 0; page-break-after: always; break-after: page; }
+    }
+
+    @media (max-width: 900px) {
+      .slide { padding: 22px 20px; height: calc(100vh - 90px); }
+      .grid-2, .grid-3, .cover-meta { grid-template-columns: 1fr; }
+      .stat-row { flex-wrap: wrap; }
+      .slide.cover h1 { font-size: 1.9rem; }
+      .slide-title { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <main class="deck-wrapper" id="deck">
+
+    <!-- SLIDE 01 -->
+    <section class="slide cover active" data-title="封面：零樣本主題分類 WC-SBERT vs. 本地量化 LLM" data-notes="大家好，今天用 20 分鐘帶大家精讀台大資工戚得郁 2025 年博士論文。這篇論文回答一個非常務實的工程問題：在完全沒有標註資料的零樣本主題分類上，我們一定要搬出昂貴的 LLM 嗎？還是優化後的輕量 Sentence-BERT 反而更穩、更快、更省？我們先從這個問題為什麼棘手開始看起。">
+      <div class="cover-tag">Paper LLM Wiki 教學精讀 · NTU CSIE 博士論文</div>
+      <h1>零樣本主題分類：<br/>WC-SBERT vs. 本地量化 LLM</h1>
+      <p class="cover-sub">
+        拆解 <strong>Chi (2025)</strong> 如何結合<strong>維基類別度數剪枝</strong>、<strong>GPT-4o 描述性標籤</strong>與<strong>單階段 MNR 自訓練</strong>，讓輕量編碼器在無目標原文下正面對決本地量化大型語言模型。
+      </p>
+      <div class="cover-meta">
+        <div class="cover-meta-card">
+          <div class="label">核心文獻</div>
+          <div class="val">Chi, Te-Yu (2025) 戚得郁<br/>DOI: 10.6342/NTU202504846</div>
+        </div>
+        <div class="cover-meta-card">
+          <div class="label">三大評測基準</div>
+          <div class="val">AG News (7.6K) · Yahoo (60K)<br/>DBpedia-14 (70K)</div>
+        </div>
+        <div class="cover-meta-card">
+          <div class="label">關鍵戰績與規格</div>
+          <div class="val">AG News 0.847 奪冠 · 0 筆目標原文<br/>預計 20 分鐘 · 共 11 頁</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 02 -->
+    <section class="slide" data-title="問題動機：為什麼零樣本主題分類這麼難？" data-notes="真實商業場景常缺乏標註資料且類別隨時增減。過去三條路各有硬傷：迭代自訓練其實偷看了目標資料集原文；直接算單字標籤相似度語意過於單薄；全丟給雲端 LLM 面對六七萬筆文本成本與隱私吃不消。接下來看 WC-SBERT 如何用兩階段架構一次拆解這三個難題。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">01 · Problem &amp; Motivation</div>
+          <h2 class="slide-title">為什麼「零樣本主題分類（ZSTC）」這麼難？</h2>
+        </div>
+        <span class="slide-badge">三大實務痛點</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card rose">
+            <h3>痛點① 偽零樣本依賴</h3>
+            <p>既有迭代自訓練法（如 Gera et al., 2022）需接觸目標集無標註原文並反覆訓練，違背純零樣本情境且易累積錯誤。</p>
+          </div>
+          <div class="card amber">
+            <h3>痛點② 短標籤語意單薄</h3>
+            <p>Bi-Encoder 直接編碼 <code>World</code>、<code>Building</code>、<code>Artist</code> 等單字，容易與鄰近類別（<code>Village</code>、<code>Album</code>）重疊混淆。</p>
+          </div>
+          <div class="card primary">
+            <h3>痛點③ 雲端 LLM 成本與隱私</h3>
+            <p>面對數萬筆即時分類流，呼叫外部商業 API 的延遲、費用與機密文本外洩皆成為部署瓶頸。</p>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">7,600</div>
+            <div class="stat-label">AG News（4 類新聞主題）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num indigo">60,000</div>
+            <div class="stat-label">Yahoo! Answers（10 類問答）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">70,000</div>
+            <div class="stat-label">DBpedia-14（14 類實體摘要）</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§1) · zstc-benchmarks.md</span>
+        <span>02 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 03 -->
+    <section class="slide" data-title="全覽架構：WC-SBERT 兩階段全景" data-notes="這張圖是整篇論文的骨架。左邊 Stage 1 只跑一次，利用維基類別共現圖教會輕量模型理解主題語意；右邊 Stage 2 迎接新任務時，不拿任何目標原文，改用離線存好的維基摘要 .npy 搭配 GPT-4o 擴寫標籤做單次自訓練。接著我們深入三個最具教學價值的工程支柱，先看 Stage 1 的長尾剪枝。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">02 · End-to-End Architecture</div>
+          <h2 class="slide-title">WC-SBERT 兩階段架構：全程不碰目標測試集原文</h2>
+        </div>
+        <span class="slide-badge">兩階段全景</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 960 275" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WC-SBERT 兩階段架構流程圖">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
+              </marker>
+              <marker id="arr-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f766e" />
+              </marker>
+            </defs>
+            <rect x="12" y="14" width="430" height="246" rx="14" fill="rgba(15,118,110,0.06)" stroke="#0f766e" stroke-dasharray="6 4" stroke-width="1.5" />
+            <text x="28" y="38" font-size="13" font-weight="800" fill="#0f766e">STAGE 1：通用主題預訓練（僅執行一次）</text>
+
+            <rect x="28" y="54" width="180" height="58" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="1.5" />
+            <text x="118" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Wikipedia 語料庫</text>
+            <text x="118" y="98" text-anchor="middle" font-size="11" fill="#475569">645 萬頁 / 156 萬類別</text>
+
+            <rect x="242" y="54" width="184" height="58" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="1.5" />
+            <text x="334" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">度數區間剪枝</text>
+            <text x="334" y="98" text-anchor="middle" font-size="11" fill="#92400e">去長尾雜訊 (-36.7%)</text>
+
+            <rect x="28" y="152" width="180" height="62" rx="10" fill="#f0fdfa" stroke="#0d9488" stroke-width="1.5" />
+            <text x="118" y="177" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">同頁類別共現對</text>
+            <text x="118" y="197" text-anchor="middle" font-size="11" fill="#0f766e">all-mpnet-base-v2 + MNR</text>
+
+            <rect x="242" y="152" width="184" height="62" rx="10" fill="#0f766e" />
+            <text x="334" y="177" text-anchor="middle" font-size="13" font-weight="800" fill="#ffffff">通用 WC-SBERT</text>
+            <text x="334" y="197" text-anchor="middle" font-size="11" fill="#ccfbf1">離線編碼 645 萬摘要 (.npy)</text>
+
+            <line x1="208" y1="83" x2="238" y2="83" stroke="#64748b" stroke-width="2" marker-end="url(#arr)" />
+            <path d="M 334 112 L 334 132 L 118 132 L 118 148" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arr)" />
+            <line x1="208" y1="183" x2="238" y2="183" stroke="#0f766e" stroke-width="2" marker-end="url(#arr-teal)" />
+
+            <rect x="478" y="14" width="470" height="246" rx="14" fill="rgba(67,56,202,0.06)" stroke="#4338ca" stroke-dasharray="6 4" stroke-width="1.5" />
+            <text x="494" y="38" font-size="13" font-weight="800" fill="#4338ca">STAGE 2：任務自訓練（0 筆目標測試集原文）</text>
+
+            <rect x="494" y="54" width="186" height="58" rx="10" fill="#ffffff" stroke="#4338ca" stroke-width="1.5" />
+            <text x="587" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">GPT-4o 描述性標籤</text>
+            <text x="587" y="98" text-anchor="middle" font-size="11" fill="#475569">統一前綴 · 語意區隔</text>
+
+            <rect x="716" y="54" width="214" height="58" rx="10" fill="#eef2ff" stroke="#4338ca" stroke-width="1.5" />
+            <text x="823" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Cosine 篩選 (&gt; t)</text>
+            <text x="823" y="98" text-anchor="middle" font-size="11" fill="#4338ca">單次配對 Hard Neg 三元組</text>
+
+            <rect x="494" y="152" width="186" height="62" rx="10" fill="#ffffff" stroke="#4338ca" stroke-width="1.5" />
+            <text x="587" y="177" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">單階段 MNR 微調</text>
+            <text x="587" y="197" text-anchor="middle" font-size="11" fill="#475569">Batch 256 · 3 epochs · FP16</text>
+
+            <rect x="716" y="152" width="214" height="62" rx="10" fill="#4338ca" />
+            <text x="823" y="177" text-anchor="middle" font-size="13" font-weight="800" fill="#ffffff">Task-Specific WC-SBERT</text>
+            <text x="823" y="197" text-anchor="middle" font-size="11" fill="#e0e7ff">毫秒級向量內積完成分類</text>
+
+            <line x1="426" y1="183" x2="460" y2="183" stroke="#0f766e" stroke-width="2" />
+            <path d="M 460 183 L 460 83 L 490 83" fill="none" stroke="#0f766e" stroke-width="2" marker-end="url(#arr-teal)" />
+            <line x1="680" y1="83" x2="712" y2="83" stroke="#64748b" stroke-width="2" marker-end="url(#arr)" />
+            <path d="M 823 112 L 823 132 L 587 132 L 587 148" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arr)" />
+            <line x1="680" y1="183" x2="712" y2="183" stroke="#64748b" stroke-width="2" marker-end="url(#arr)" />
+          </svg>
+        </div>
+        <div class="callout teal">
+          <strong>核心設計哲學</strong>：Stage 1 僅需訓練一次並將 645 萬篇維基摘要預存為 <code>.npy</code>；切換至全新分類任務時<strong>不碰任何目標原文</strong>，單靠描述性標籤即可快速適配。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§3) · wc-sbert-and-label-augmentation.md</span>
+        <span>03 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 04 -->
+    <section class="slide" data-title="支柱一：維基類別共現圖與 Zipf 度數剪枝" data-notes="第一堂資料工程課是「髒資料比少資料更致命」。原始 156 萬維基類別呈 Zipf 長尾，超高頻幾乎全是無主題意義的編務維護標籤。透過三段式度數抽樣保留中頻黃金區、大幅下採樣極端高低頻，資料瘦身 36.7% 卻維持 99.1% 語意覆蓋率，AG News 準確率立刻從 0.695 跳升到 0.749。那後續每層技術又各自貢獻了多少？我們看逐層消融實驗。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">03 · Pillar 1: Stage 1 Category Pruning</div>
+          <h2 class="slide-title">維基類別共現圖：為何「度數剪枝」是成敗第一關？</h2>
+        </div>
+        <span class="slide-badge">長尾雜訊治理</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 920 205" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zipf 長尾度數區間剪枝圖">
+            <rect x="46" y="20" width="210" height="145" rx="8" fill="rgba(225,29,72,0.09)" />
+            <rect x="256" y="20" width="380" height="145" rx="8" fill="rgba(15,118,110,0.11)" />
+            <rect x="636" y="20" width="250" height="145" rx="8" fill="rgba(67,56,202,0.08)" />
+
+            <line x1="46" y1="165" x2="886" y2="165" stroke="#64748b" stroke-width="1.8" />
+            <line x1="46" y1="20" x2="46" y2="165" stroke="#64748b" stroke-width="1.8" />
+            <path d="M 58 34 Q 115 112 256 128 Q 440 144 636 153 L 876 159" fill="none" stroke="#0f172a" stroke-width="3" />
+
+            <text x="151" y="42" text-anchor="middle" font-size="13" font-weight="800" fill="#e11d48">高頻雜訊區 (d &gt; 500)</text>
+            <text x="151" y="61" text-anchor="middle" font-size="11.5" font-weight="700" fill="#be123c">僅隨機保留 2%</text>
+            <text x="151" y="80" text-anchor="middle" font-size="10.5" fill="#475569">例：Use British English</text>
+
+            <text x="446" y="46" text-anchor="middle" font-size="14" font-weight="800" fill="#0f766e">中頻黃金主題區 (5 ≤ d ≤ 500)</text>
+            <text x="446" y="68" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0d9488">100% 完整保留</text>
+            <text x="446" y="90" text-anchor="middle" font-size="11" fill="#334155">承載核心領域主題共現關係（如 Basketball ↔ Team sports）</text>
+
+            <text x="761" y="46" text-anchor="middle" font-size="13" font-weight="800" fill="#4338ca">極低頻長尾 (d &lt; 5)</text>
+            <text x="761" y="66" text-anchor="middle" font-size="11.5" font-weight="700" fill="#3730a3">隨機保留 20%</text>
+            <text x="761" y="86" text-anchor="middle" font-size="10.5" fill="#475569">抑制過度瑣碎之孤立類別</text>
+
+            <text x="466" y="190" text-anchor="middle" font-size="11.5" font-weight="700" fill="#475569">類別節點度數（由高至低排序，呈現典型 Zipf 長尾分布）</text>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num rose">-36.7%</div>
+            <div class="stat-label">類別瘦身（1.56M → 0.99M）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">23,467</div>
+            <div class="stat-label">最大度數壓降（原 1,013,030）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num indigo">0.9910</div>
+            <div class="stat-label">語意覆蓋率（Pearson r=0.9174）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num">+7.8%</div>
+            <div class="stat-label">AG News 躍升（0.695 → 0.749）</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§3.1, Table 5.6) · wc-sbert-and-label-augmentation.md</span>
+        <span>04 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 05 -->
+    <section class="slide" data-title="逐層消融實驗：各階段技術貢獻拆解" data-notes="讀系統論文必看逐層消融。左邊 AG News 穩定爬坡到 0.847，但右邊 DBpedia 揭露了最大功臣：從手寫模板 0.718 到 GPT-4o 描述性標籤一口氣衝上 0.883，暴增 16.5 個百分點；反觀後續 Stage 2 自訓練僅微增 0.3% 到 1.3%。這引出下一個關鍵問題：GPT-4o 標籤到底怎麼設計，為何全自動 APE 反而慘敗？">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">04 · Ablation Ladder</div>
+          <h2 class="slide-title">六層技術疊加，哪一項貢獻了最大準確率躍升？</h2>
+        </div>
+        <span class="slide-badge">逐層消融拆解</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card teal">
+            <h3>AG News 六階攀升（0.654 → 0.847）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Original SBERT（未預訓練）</span><strong>0.654</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 65.4%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>+ Wiki 預訓練（未剪枝）</span><strong>0.695</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 69.5%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>+ 度數剪枝（Label Only）</span><strong>0.749 (+7.8%)</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 74.9%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>+ 手寫統一模板</span><strong>0.813 (+8.6%)</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 81.3%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>+ GPT-4o 描述性標籤</span><strong>0.836 (+2.8%)</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 83.6%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>+ 單階段 MNR 自訓練（最終）</span><strong>0.847 (+1.3%)</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 84.7%;"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card primary">
+            <h3>DBpedia &amp; Yahoo 關鍵躍升對照</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>DBpedia：剪枝（Label Only）</span><strong>0.614</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 61.4%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>DBpedia：+ 手寫模板</span><strong>0.718</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 71.8%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>DBpedia：+ GPT-4o 標籤（最大爆發）</span><strong>0.883 (+23.0%)</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 88.3%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>DBpedia：+ MNR 自訓練</span><strong>0.886 (+0.3%)</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 88.6%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Yahoo：模板 → GPT-4o 標籤</span><strong>0.622 → 0.643</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 64.3%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Yahoo：+ MNR 自訓練</span><strong>0.649 (+0.9%)</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 64.9%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="callout amber">
+          <strong>教學重點</strong>：剪枝預訓練與 GPT-4o 描述性標籤吃下超過九成紅利；DBpedia 單靠標籤增強即躍升 <strong>+16.5 個百分點</strong>，Stage 2 自訓練僅帶來 <code>+0.3%</code>～<code>+1.3%</code> 微幅精修。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§4.1, Tables 5.6 / 5.8 / 5.13 / 5.18)</span>
+        <span>05 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 06 -->
+    <section class="slide" data-title="支柱二：GPT-4o 描述性標籤為何大勝全自動 APE？" data-notes="這是全篇最反直覺的一課：交給全自動 APE 跑多輪生成，AG News 竟然掉到 0.693，比原始單字標籤還差！因為沒有約束的 APE 容易寫出抽象百科定義且各類句式不一，把嵌入空間打亂。只要給 GPT-4o 三條清晰規則——統一前綴、精準字數、跨類去重——準確率立刻飆升。有了好標籤，接下來看 Stage 2 如何不碰目標原文完成自訓練。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">05 · Pillar 2: Descriptive Label Augmentation</div>
+          <h2 class="slide-title">為何「人工引導 GPT-4o 標籤」大勝全自動 APE？</h2>
+        </div>
+        <span class="slide-badge">GPT-4o vs. APE</span>
+      </header>
+      <div class="slide-body">
+        <div class="card primary" style="padding: 12px 16px;">
+          <table>
+            <thead>
+              <tr><th>標籤策略</th><th>範例寫法（以 AG News <code>World</code> 為例）</th><th>AG News</th><th>DBpedia</th><th>成敗關鍵</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>單字標籤</strong></td>
+                <td><code>"World"</code></td>
+                <td>0.749</td>
+                <td>0.614</td>
+                <td>語意過於單薄、鄰類重疊</td>
+              </tr>
+              <tr>
+                <td><strong>手寫統一模板</strong></td>
+                <td><code>"This news article is about World"</code></td>
+                <td>0.813</td>
+                <td>0.718</td>
+                <td>有前綴但缺關鍵區辨詞彙</td>
+              </tr>
+              <tr class="warn">
+                <td><strong>全自動 APE (T=0.8)</strong></td>
+                <td><code>"World is a term that encompasses the entire planet..."</code></td>
+                <td><strong>0.693 (↓)</strong></td>
+                <td>—</td>
+                <td>抽象百科風且句式不一，破壞空間</td>
+              </tr>
+              <tr class="highlight">
+                <td>GPT-4o 人工引導</td>
+                <td><code>"This news article reports on global news, international..."</code></td>
+                <td>0.836</td>
+                <td>0.883</td>
+                <td>一致前綴＋客觀描述＋跨類去重</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid-3">
+          <div class="card teal">
+            <h3>規則① 統一句型前綴</h3>
+            <p>所有類別共用相同開頭句式，消除 Bi-Encoder 對表層語氣差異的雜訊干擾。</p>
+          </div>
+          <div class="card primary">
+            <h3>規則② 控制 15–30 字</h3>
+            <p>採用客觀學術語氣精準描寫主題範圍，避免發散成抽象百科釋義。</p>
+          </div>
+          <div class="card amber">
+            <h3>規則③ 禁止跨類重複詞</h3>
+            <p>刻意拉開相近類別的向量距離，緩解 <code>Building / Village</code> 等語意混淆。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§3.2, Tables 5.13 / 5.16) · wc-sbert-and-label-augmentation.md</span>
+        <span>06 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 07 -->
+    <section class="slide" data-title="支柱三：離線 .npy 重用與單階段 MNR 自訓練" data-notes="Stage 2 解決了傳統自訓練的兩大毛病：不需接觸測試集原文，也不跑會累積錯誤的多輪迭代。作者把 645 萬篇維基摘要事先存成 .npy 跨任務重用，每逢新任務只算一次相似度篩選，組出含 Hard Negative 的三元組用 MNR Loss 跑 3 個 epoch 就全面超越 ACM TIST 2024 原版。接著看重頭戲：輕量 WC-SBERT 正面對決 Ollama 本地量化 LLM。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">06 · Pillar 3: Single-Pass MNR Self-Training</div>
+          <h2 class="slide-title">離線 <code>.npy</code> 重用 ＋ 單階段 MNR 如何取代多輪迭代？</h2>
+        </div>
+        <span class="slide-badge">Stage 2 改良</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 920 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stage 2 離線預編碼與單階段 MNR 三元組流程圖">
+            <defs>
+              <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#4338ca" />
+              </marker>
+            </defs>
+            <rect x="16" y="24" width="200" height="62" rx="10" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.6" />
+            <text x="116" y="49" text-anchor="middle" font-size="13" font-weight="800" fill="#0f172a">645 萬 Wiki 摘要 .npy</text>
+            <text x="116" y="70" text-anchor="middle" font-size="11" fill="#0f766e">離線預編碼 · 跨任務重用</text>
+
+            <rect x="16" y="122" width="200" height="62" rx="10" fill="#eef2ff" stroke="#4338ca" stroke-width="1.6" />
+            <text x="116" y="147" text-anchor="middle" font-size="13" font-weight="800" fill="#0f172a">GPT-4o 描述性標籤</text>
+            <text x="116" y="168" text-anchor="middle" font-size="11" fill="#4338ca">目標任務類別向量</text>
+
+            <rect x="262" y="64" width="192" height="82" rx="12" fill="#fffbeb" stroke="#d97706" stroke-width="1.6" />
+            <text x="358" y="92" text-anchor="middle" font-size="13" font-weight="800" fill="#0f172a">單次 Cosine 篩選</text>
+            <text x="358" y="113" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b45309">cos(p, l) &gt; t (0.75–0.77)</text>
+            <text x="358" y="133" text-anchor="middle" font-size="10.5" fill="#475569">取代多輪迭代 · 零錯誤累積</text>
+
+            <rect x="498" y="42" width="212" height="126" rx="12" fill="#ffffff" stroke="#4338ca" stroke-width="1.6" />
+            <text x="604" y="68" text-anchor="middle" font-size="13" font-weight="800" fill="#4338ca">MNR 三元組構造</text>
+            <text x="604" y="93" text-anchor="middle" font-size="11.5" fill="#0f172a">Anchor：該頁 Wiki 類別 c</text>
+            <text x="604" y="114" text-anchor="middle" font-size="11.5" fill="#0f766e">Pos：最相似標籤 l+</text>
+            <text x="604" y="135" text-anchor="middle" font-size="11.5" fill="#e11d48">Hard Neg：最遠標籤 l-</text>
+            <text x="604" y="155" text-anchor="middle" font-size="10.5" fill="#64748b">Batch 256 · lr 2e-5 · 3 ep · FP16</text>
+
+            <rect x="750" y="68" width="154" height="74" rx="12" fill="#0f766e" />
+            <text x="827" y="98" text-anchor="middle" font-size="13" font-weight="800" fill="#ffffff">任務專屬</text>
+            <text x="827" y="120" text-anchor="middle" font-size="13" font-weight="800" fill="#ccfbf1">WC-SBERT</text>
+
+            <path d="M 216 55 L 238 55 L 238 92 L 258 92" fill="none" stroke="#4338ca" stroke-width="2" marker-end="url(#arr2)" />
+            <path d="M 216 153 L 238 153 L 238 118 L 258 118" fill="none" stroke="#4338ca" stroke-width="2" marker-end="url(#arr2)" />
+            <line x1="454" y1="105" x2="494" y2="105" stroke="#4338ca" stroke-width="2" marker-end="url(#arr2)" />
+            <line x1="710" y1="105" x2="746" y2="105" stroke="#4338ca" stroke-width="2" marker-end="url(#arr2)" />
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">0.847</div>
+            <div class="stat-label">AG News（勝 2024 原版 0.840）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num indigo">0.649</div>
+            <div class="stat-label">Yahoo（勝 2024 原版 0.638）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">0.886</div>
+            <div class="stat-label">DBpedia（勝 2024 原版 0.881）</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num">0 筆</div>
+            <div class="stat-label">接觸下游測試集原文數</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§3.3, Tables 5.18 / 5.20) · wc-sbert-and-label-augmentation.md</span>
+        <span>07 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 08 -->
+    <section class="slide" data-title="正面對決：WC-SBERT vs. Ollama 本地量化 LLM" data-notes="這裡打破一個常見迷思：不是換成 LLM 就一定贏！在嚴格 T=0 與 JSON 整數輸出控制下，輕量 WC-SBERT 在 AG News 拿下 0.847 奪冠，在 Yahoo 與 DBpedia 也僅小輸表現最強的 Gemma 2，並大幅擊敗 Llama 3.1、Llama 3.2 與同 Prompt 下的 GPT-4o mini。接下來我們把結果放回整個 ZSTC 學術版圖做公平定位。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">07 · Head-to-Head Benchmark (Table 5.19)</div>
+          <h2 class="slide-title">正面對決：WC-SBERT vs. Ollama 本地量化 LLM</h2>
+        </div>
+        <span class="slide-badge">三基準實測</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card teal">
+            <h3>AG News（4 類）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>WC-SBERT (輕量)</span><strong>0.847 ★</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 84.7%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gemma 2 (FS)</span><strong>0.832</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 83.2%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.1 (FS)</span><strong>0.680</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 68.0%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>GPT-4o mini (FS)</span><strong>0.655</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 65.5%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.2 (FS)</span><strong>0.601</strong></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 60.1%;"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card primary">
+            <h3>Yahoo! Answers（10 類）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gemma 2 (ZS)</span><strong>0.659 ★</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 65.9%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>WC-SBERT (輕量)</span><strong>0.649</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 64.9%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.1 (FS)</span><strong>0.572</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 57.2%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>GPT-4o mini (FS)</span><strong>0.509</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 50.9%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.2 (FS)</span><strong>0.461</strong></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 46.1%;"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card amber">
+            <h3>DBpedia-14（14 類）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gemma 2 (FS)</span><strong>0.915 ★</strong></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 91.5%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>WC-SBERT (輕量)</span><strong>0.886</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 88.6%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>GPT-4o mini (FS)</span><strong>0.841</strong></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 84.1%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.1 (FS)</span><strong>0.761</strong></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 76.1%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Llama 3.2 (FS)</span><strong>0.649</strong></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 64.9%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>推論條件控制</strong>：Ollama 模型與 GPT-4o mini 皆強制 <code>temperature = 0</code> ＋ JSON 整數輸出（<code>{"label": int}</code>）；Few-shot 為每類 1 筆 GPT-4o 範例。極小量化模型（Llama 3.2）掉點顯著。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§3.4 &amp; §4.2, Table 5.19) · zstc-benchmarks.md</span>
+        <span>08 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 09 -->
+    <section class="slide" data-title="全景基準定位：純零樣本 vs. 接觸目標集 vs. 全監督" data-notes="讀論文比較表時，永遠先看「實驗條件」再看數字。Gera (2022) 拿目標資料集做 Transductive 偽標籤，才在 DBpedia 衝到 0.945；相比之下，WC-SBERT 堅持完全不碰目標文本，依然在 AG News 與 Yahoo 勝出，並逼近全監督上限的八到九成。看完了所有亮點，下一頁我們切換到批判性視角，檢視這篇論文的四個限制與避坑點。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">08 · Benchmark Positioning</div>
+          <h2 class="slide-title">全景基準定位：純零樣本 vs. 接觸目標集 vs. 全監督</h2>
+        </div>
+        <span class="slide-badge">跨路線公平對照</span>
+      </header>
+      <div class="slide-body">
+        <div class="card primary" style="padding: 12px 16px;">
+          <table>
+            <thead>
+              <tr><th>方法 / 模型</th><th>實驗條件與是否接觸目標原文</th><th>AG News</th><th>Yahoo</th><th>DBpedia</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>BERT Fully Finetuned</strong> (Ding 2022)</td>
+                <td>全監督上限（完整標註訓練集）</td>
+                <td><em>0.944</em></td>
+                <td><em>0.753</em></td>
+                <td><em>0.993</em></td>
+              </tr>
+              <tr>
+                <td><strong>Gera et al. (2022)</strong></td>
+                <td>多輪迭代自訓練（<strong>接觸目標原文</strong>）</td>
+                <td>0.814</td>
+                <td>0.620</td>
+                <td><strong>0.945</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Ding et al. (2022)</strong></td>
+                <td>維基預訓練 BERT（純零樣本）</td>
+                <td>0.796</td>
+                <td>0.573</td>
+                <td>0.902</td>
+              </tr>
+              <tr>
+                <td><strong>Chi &amp; Jang (2024, TIST)</strong></td>
+                <td>原版 WC-SBERT（多輪＋Contrastive）</td>
+                <td>0.840</td>
+                <td>0.638</td>
+                <td>0.881</td>
+              </tr>
+              <tr class="highlight">
+                <td>WC-SBERT (Chi 2025 最終版)</td>
+                <td>剪枝＋GPT-4o 標籤＋單階段 MNR（純零樣本）</td>
+                <td>0.847</td>
+                <td>0.649</td>
+                <td>0.886</td>
+              </tr>
+              <tr>
+                <td><strong>Gemma 2</strong> (Ollama, ZS / FS)</td>
+                <td>本地量化 LLM（<code>T=0</code>, JSON Schema）</td>
+                <td>0.817 / 0.832</td>
+                <td><strong>0.659</strong> / 0.654</td>
+                <td>0.903 / <strong>0.915</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout teal">
+          <strong>公平性分水嶺</strong>：Gera (2022) 仰賴目標資料集無標註原文在 DBpedia 達 <code>0.945</code>；WC-SBERT 堅持 <strong>0 筆目標原文</strong>，仍在 AG News 與 Yahoo 反超，並逼近全監督 85%–90% 實力。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/benchmarks/zstc-benchmarks.md (§1–3) · 2025-chi-zero-shot-topic-classification.md</span>
+        <span>09 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 10 -->
+    <section class="slide" data-title="批判性閱讀：四大實務限制與工程避坑" data-notes="嚴謹的精讀一定要看限制與實驗盲區。這四點特別值得記下：第一，做原型時靠剪枝預訓練加 GPT 標籤就能吃下九成以上紅利；第二，Table 5.19 少了參數量、量化版本與毫秒延遲對比，這正好可以跟 Wiki 裡陳冠錞 (2025) 的能耗實測互補；第三，閾值 t 尚未自動化且有一處百分比筆誤；第四，3,599 筆 Building 誤判為 Village 提醒我們 Bi-Encoder 的結構邊界。最後收斂成工程選型清單與討論題。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">09 · Critical Reading &amp; Pitfalls</div>
+          <h2 class="slide-title">讀論文不能只看亮點：四大實務限制與檢視要點</h2>
+        </div>
+        <span class="slide-badge">批判性閱讀</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card amber">
+            <h3>避坑① Stage 2 邊際效益極小</h3>
+            <p>DBpedia 靠 GPT-4o 標籤躍升 <code>+16.5 pp</code>，但整個 Stage 2 僅微增 <code>+0.3%</code>（<code>0.883→0.886</code>）；實務 MVP 可先省去自訓練。</p>
+          </div>
+          <div class="card rose">
+            <h3>避坑② 本地 LLM 規格與延遲缺漏</h3>
+            <p>Table 5.19 未標明各模型參數量與量化版本（<code>q4_0</code> / <code>q4_K_M</code>），亦缺實測推論延遲（ms）與耗電（J）數據。</p>
+          </div>
+          <div class="card primary">
+            <h3>避坑③ 手動閾值與文表勘誤</h3>
+            <p>閾值 <code>t</code>（0.75–0.77）仍靠人工微調；Ch.6 p.80 寫 DBpedia 升 18.5%，與 Table 5.13 實測（+16.5 pp / 相對 +23.0%）有出入。</p>
+          </div>
+          <div class="card teal">
+            <h3>避坑④ Bi-Encoder 語意混淆上限</h3>
+            <p>DBpedia 有 <strong>3,599 筆</strong> <code>Building</code> 誤分為 <code>Village</code>（簡介常提所在地），反映向量池化難區分主體與背景。</p>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num amber">+0.3%</div>
+            <div class="stat-label">DBpedia Stage 2 邊際增益</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num rose">3,599 筆</div>
+            <div class="stat-label">Building → Village 誤判</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num indigo">跨論文互補</div>
+            <div class="stat-label">陳冠錞 (2025) 補齊 Ollama 延遲與能耗實測</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2025-chi-zero-shot-topic-classification.md (§5) · llm-inference-efficiency-and-deployment.md</span>
+        <span>10 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 11 -->
+    <section class="slide" data-title="總結與討論：工程選型清單與讀書會 Q&A" data-notes="最後帶走三個關鍵數字：度數剪枝 +7.8%、GPT-4o 描述性標籤讓 DBpedia 相對躍升 +23%、以及 WC-SBERT 在 AG News 以 0.847 奪冠。面對實務專案，先用輕量編碼器加高品質標籤吃下絕大多數請求，把昂貴的 LLM 留給低信心邊界樣本。現在把時間交給大家，歡迎從右邊三道問題開始討論！">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">10 · Takeaways &amp; Reading-Group Q&amp;A</div>
+          <h2 class="slide-title">工程選型決策清單與三道讀書會討論題</h2>
+        </div>
+        <span class="slide-badge">落地與思辨</span>
+      </header>
+      <div class="slide-body">
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">+7.8%</div>
+            <div class="stat-label">維基度數剪枝即時增益</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">+23.0%</div>
+            <div class="stat-label">GPT-4o 標籤 DBpedia 相對躍升</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num indigo">0.847</div>
+            <div class="stat-label">輕量編碼器 AG News 奪冠</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card teal">
+            <h3>工程選型 Checklist</h3>
+            <ul>
+              <li><strong>高吞吐 / 低預算分類</strong>：首選 <strong>WC-SBERT ＋ GPT-4o 標籤</strong>，毫秒內積取代生成式推論。</li>
+              <li><strong>細粒度複雜語意</strong>：選用 <strong>Gemma 2 本地量化</strong>（<code>T=0</code> + JSON Schema），避開極小量化掉點。</li>
+              <li><strong>Hybrid 混合路由</strong>：用 WC-SBERT Top-1/Top-2 Margin 分流，僅低信心樣本交 LLM 複核。</li>
+            </ul>
+          </div>
+          <div class="card primary">
+            <h3>讀書會討論題（Q&amp;A）</h3>
+            <ul>
+              <li><strong>Q1</strong>：為何缺乏目標分布錨定的 APE（0.693）慘敗給人工引導標籤（0.836）？</li>
+              <li><strong>Q2</strong>：以 WC-SBERT Margin 路由給 Gemma 2，能否同時兼顧 90%+ 準確率與毫秒延遲？</li>
+              <li><strong>Q3</strong>：<code>Building → Village</code>（3,599 筆）揭露了 Bi-Encoder 向量池化的什麼本質限制？</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>Wiki 參考：2025-chi-*.md · wc-sbert-*.md · zstc-benchmarks.md｜快捷鍵：←/→ · N 筆記 · O 全覽 · F 全螢幕</span>
+        <span>11 / 11</span>
+      </footer>
+    </section>
+
+  </main>
+
+  <aside class="notes-drawer" id="notesDrawer" aria-live="polite">
+    <div class="notes-header">
+      <span>講者筆記（Speaker Notes）</span>
+      <button class="ctrl-btn" id="closeNotesBtn" type="button">關閉 (N)</button>
+    </div>
+    <p class="notes-text" id="notesText"></p>
+  </aside>
+
+  <div class="overview-modal" id="overviewModal" role="dialog" aria-modal="true" aria-label="投影片全覽">
+    <div class="overview-top">
+      <h2 style="font-size: 1.25rem;">投影片全覽（點擊跳轉）</h2>
+      <button class="ctrl-btn" id="closeOverviewBtn" type="button">關閉 (Esc / O)</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <nav class="controls" aria-label="簡報控制列">
+    <button class="ctrl-btn" id="prevBtn" type="button" title="上一頁 (←)">← 上一頁</button>
+    <span class="slide-counter" id="slideCounter">01 / 11</span>
+    <button class="ctrl-btn" id="nextBtn" type="button" title="下一頁 (→)">下一頁 →</button>
+    <button class="ctrl-btn" id="notesBtn" type="button" title="切換講者筆記 (N)">筆記</button>
+    <button class="ctrl-btn" id="overviewBtn" type="button" title="投影片全覽 (O)">全覽</button>
+    <button class="ctrl-btn" id="themeBtn" type="button" title="切換深淺主題">深色</button>
+    <button class="ctrl-btn" id="printBtn" type="button" title="列印或匯出 PDF">匯出 PDF</button>
+  </nav>
+
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const progressFill = document.getElementById('progressFill');
+      const slideCounter = document.getElementById('slideCounter');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const notesBtn = document.getElementById('notesBtn');
+      const closeNotesBtn = document.getElementById('closeNotesBtn');
+      const notesDrawer = document.getElementById('notesDrawer');
+      const notesText = document.getElementById('notesText');
+      const overviewBtn = document.getElementById('overviewBtn');
+      const closeOverviewBtn = document.getElementById('closeOverviewBtn');
+      const overviewModal = document.getElementById('overviewModal');
+      const overviewGrid = document.getElementById('overviewGrid');
+      const themeBtn = document.getElementById('themeBtn');
+      const printBtn = document.getElementById('printBtn');
+
+      let current = 0;
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function renderOverview() {
+        overviewGrid.innerHTML = '';
+        slides.forEach((slide, idx) => {
+          const card = document.createElement('div');
+          card.className = 'overview-card' + (idx === current ? ' current' : '');
+          card.innerHTML =
+            '<div class="overview-num">SLIDE ' + pad(idx + 1) + '</div>' +
+            '<div class="overview-title">' + (slide.dataset.title || ('Slide ' + (idx + 1))) + '</div>';
+          card.addEventListener('click', () => {
+            goTo(idx);
+            overviewModal.classList.remove('open');
+          });
+          overviewGrid.appendChild(card);
+        });
+      }
+
+      function goTo(index) {
+        if (index < 0) index = 0;
+        if (index >= slides.length) index = slides.length - 1;
+        slides[current].classList.remove('active');
+        current = index;
+        slides[current].classList.add('active');
+        slideCounter.textContent = pad(current + 1) + ' / ' + pad(slides.length);
+        progressFill.style.width = ((current + 1) / slides.length * 100) + '%';
+        notesText.textContent = slides[current].dataset.notes || '本頁無額外講者筆記。';
+        history.replaceState(null, '', '#slide-' + (current + 1));
+        if (overviewModal.classList.contains('open')) renderOverview();
+      }
+
+      function toggleNotes() {
+        const isOpen = notesDrawer.classList.toggle('open');
+        notesBtn.classList.toggle('active', isOpen);
+      }
+
+      function toggleOverview() {
+        const isOpen = overviewModal.classList.toggle('open');
+        if (isOpen) renderOverview();
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+          document.documentElement.removeAttribute('data-theme');
+          themeBtn.textContent = '深色';
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          themeBtn.textContent = '淺色';
+        }
+      }
+
+      prevBtn.addEventListener('click', () => goTo(current - 1));
+      nextBtn.addEventListener('click', () => goTo(current + 1));
+      notesBtn.addEventListener('click', toggleNotes);
+      closeNotesBtn.addEventListener('click', toggleNotes);
+      overviewBtn.addEventListener('click', toggleOverview);
+      closeOverviewBtn.addEventListener('click', toggleOverview);
+      themeBtn.addEventListener('click', toggleTheme);
+      printBtn.addEventListener('click', () => window.print());
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          if (!overviewModal.classList.contains('open')) { e.preventDefault(); goTo(current + 1); }
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          if (!overviewModal.classList.contains('open')) { e.preventDefault(); goTo(current - 1); }
+        } else if (e.key === 'Home') { goTo(0); }
+        else if (e.key === 'End') { goTo(slides.length - 1); }
+        else if (e.key.toLowerCase() === 'n') { toggleNotes(); }
+        else if (e.key.toLowerCase() === 'o') { toggleOverview(); }
+        else if (e.key === 'Escape') {
+          overviewModal.classList.remove('open');
+          notesDrawer.classList.remove('open');
+          notesBtn.classList.remove('active');
+        } else if (e.key.toLowerCase() === 'f') {
+          if (!document.fullscreenElement) { document.documentElement.requestFullscreen?.(); }
+          else { document.exitFullscreen?.(); }
+        }
+      });
+
+      let touchStartX = 0;
+      document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+      document.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].screenX - touchStartX;
+        if (dx < -50) goTo(current + 1);
+        if (dx > 50) goTo(current - 1);
+      }, { passive: true });
+
+      const match = window.location.hash.match(/^#slide-(\d+)$/);
+      goTo(match ? parseInt(match[1], 10) - 1 : 0);
+    })();
+  </script>
+</body>
+</html>

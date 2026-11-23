@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM 合成問答與 Critique 過濾管線 — Paper LLM Wiki 簡報</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --ink: #0f172a;
+      --ink-muted: #475569;
+      --ink-subtle: #64748b;
+      --border: #e2e8f0;
+      --primary: #4f46e5;
+      --primary-soft: #eef2ff;
+      --teal: #0d9488;
+      --teal-soft: #f0fdfa;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --rose: #e11d48;
+      --rose-soft: #fff1f2;
+      --shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+      --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --surface: #111827;
+      --surface-alt: #1e293b;
+      --ink: #f1f5f9;
+      --ink-muted: #cbd5e1;
+      --ink-subtle: #94a3b8;
+      --border: #334155;
+      --primary: #818cf8;
+      --primary-soft: rgba(99, 102, 241, 0.16);
+      --teal: #2dd4bf;
+      --teal-soft: rgba(20, 184, 166, 0.14);
+      --amber: #fbbf24;
+      --amber-soft: rgba(245, 158, 11, 0.14);
+      --rose: #fb7185;
+      --rose-soft: rgba(244, 63, 94, 0.15);
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      overflow: hidden;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    .progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      z-index: 100;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--teal));
+      width: 0%;
+      transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .deck-wrapper {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 24px 72px;
+    }
+
+    .slide {
+      display: none;
+      width: min(1220px, 100%);
+      height: min(686px, calc(100vh - 104px));
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 40px 50px 34px;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow-y: auto;
+      animation: fadeSlideIn 0.26s ease;
+    }
+    .slide.active { display: flex; }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .slide-kicker {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .slide-title {
+      font-size: 1.72rem;
+      font-weight: 800;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+    .slide-badge {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .slide-footer {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--ink-subtle);
+    }
+
+    .slide.cover {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #134e4a 100%);
+      color: #f8fafc;
+      border: none;
+      justify-content: center;
+      padding: 56px 64px;
+    }
+    .slide.cover .cover-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #c7d2fe;
+      margin-bottom: 22px;
+      width: fit-content;
+    }
+    .slide.cover h1 {
+      font-size: 2.75rem;
+      font-weight: 900;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+    .slide.cover .cover-sub {
+      font-size: 1.2rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      max-width: 780px;
+      margin-bottom: 34px;
+    }
+    .cover-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      max-width: 860px;
+    }
+    .cover-meta-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .cover-meta-card .label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #99f6e4;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .cover-meta-card .val {
+      font-size: 0.92rem;
+      color: #f8fafc;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: stretch; }
+    .grid-2-wide { display: grid; grid-template-columns: 1.12fr 0.88fr; gap: 22px; align-items: stretch; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+
+    .card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card.primary { border-top: 4px solid var(--primary); }
+    .card.teal { border-top: 4px solid var(--teal); }
+    .card.amber { border-top: 4px solid var(--amber); }
+    .card.rose { border-top: 4px solid var(--rose); }
+
+    .card h3 { font-size: 1.03rem; font-weight: 700; color: var(--ink); }
+    .card p, .card li { font-size: 0.91rem; line-height: 1.55; color: var(--ink-muted); }
+    .card ul { padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+
+    .callout {
+      padding: 13px 18px;
+      border-radius: 12px;
+      font-size: 0.91rem;
+      line-height: 1.55;
+      border-left: 4px solid var(--primary);
+      background: var(--primary-soft);
+      color: var(--ink);
+    }
+    .callout.teal { border-left-color: var(--teal); background: var(--teal-soft); }
+    .callout.amber { border-left-color: var(--amber); background: var(--amber-soft); }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.84em;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 7px; }
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 4px 9px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .pill.accent { background: var(--teal-soft); border-color: var(--teal); color: var(--teal); }
+
+    .stat-row { display: flex; gap: 14px; }
+    .stat-box {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 13px 14px;
+      text-align: center;
+    }
+    .stat-num { font-size: 1.75rem; font-weight: 900; color: var(--primary); line-height: 1.15; }
+    .stat-num.teal { color: var(--teal); }
+    .stat-num.amber { color: var(--amber); }
+    .stat-label { font-size: 0.78rem; color: var(--ink-subtle); margin-top: 4px; font-weight: 600; }
+
+    .chart-group { display: flex; flex-direction: column; gap: 11px; }
+    .bar-item { display: flex; flex-direction: column; gap: 4px; }
+    .bar-meta { display: flex; justify-content: space-between; font-size: 0.84rem; font-weight: 600; color: var(--ink-muted); }
+    .bar-meta strong { color: var(--ink); }
+    .bar-track { height: 14px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--ink-subtle); }
+    .bar-fill.primary { background: linear-gradient(90deg, var(--primary), #6366f1); }
+    .bar-fill.teal { background: linear-gradient(90deg, var(--teal), #14b8a6); }
+    .bar-fill.amber { background: linear-gradient(90deg, var(--amber), #f59e0b); }
+    .bar-fill.rose { background: linear-gradient(90deg, var(--rose), #f43f5e); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { font-weight: 700; color: var(--ink); background: var(--surface-alt); }
+    td { color: var(--ink-muted); }
+    tr.highlight td { background: var(--teal-soft); color: var(--ink); font-weight: 700; }
+
+    .diagram-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .diagram-box svg { width: 100%; height: auto; max-height: 350px; }
+
+    .controls {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 7px 14px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      z-index: 90;
+    }
+    .ctrl-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: var(--font-sans);
+    }
+    .ctrl-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .ctrl-btn.active { background: var(--primary); border-color: var(--primary); color: #ffffff; }
+    .slide-counter { font-family: var(--font-mono); font-size: 0.84rem; font-weight: 700; color: var(--ink); min-width: 64px; text-align: center; }
+
+    .notes-drawer {
+      position: fixed;
+      bottom: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(920px, calc(100vw - 32px));
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+      z-index: 95;
+      display: none;
+    }
+    .notes-drawer.open { display: block; }
+    .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.82rem; font-weight: 700; color: var(--primary); }
+    .notes-text { font-size: 0.9rem; line-height: 1.65; color: var(--ink-muted); }
+
+    .overview-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 120;
+      display: none;
+      flex-direction: column;
+      padding: 28px 36px;
+      overflow-y: auto;
+    }
+    .overview-modal.open { display: flex; }
+    .overview-top { display: flex; justify-content: space-between; align-items: center; color: #f8fafc; margin-bottom: 20px; }
+    .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .overview-card { background: var(--surface); border: 2px solid transparent; border-radius: 12px; padding: 16px; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+    .overview-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+    .overview-card.current { border-color: var(--teal); }
+    .overview-num { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+    .overview-title { font-size: 0.96rem; font-weight: 700; color: var(--ink); line-height: 1.4; }
+
+    @media print {
+      html, body { overflow: visible; background: #fff; }
+      .progress-track, .controls, .notes-drawer, .overview-modal { display: none !important; }
+      .deck-wrapper { display: block; height: auto; padding: 0; }
+      .slide { display: flex !important; width: 100%; height: 100vh; box-shadow: none; border: none; border-radius: 0; page-break-after: always; break-after: page; }
+    }
+
+    @media (max-width: 900px) {
+      .slide { padding: 24px 22px; height: calc(100vh - 90px); }
+      .grid-2, .grid-2-wide, .grid-4, .cover-meta { grid-template-columns: 1fr; }
+      .slide.cover h1 { font-size: 1.95rem; }
+      .slide-title { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <main class="deck-wrapper" id="deck">
+
+    <!-- SLIDE 01 -->
+    <section class="slide cover active" data-title="封面：LLM 合成問答與 Critique 過濾管線" data-notes="歡迎來到本次 20 分鐘的讀書會分享！今天我們從工程實作的角度，拆解如何在完全沒有人工標註的封閉醫療領域，用現成開源 LLM 打造高品質微調資料集。下一頁我們先看為什麼既有方法在這個場景會卡關。">
+      <div class="cover-tag">Paper LLM Wiki 讀書會簡報 · 工程實作專題</div>
+      <h1>LLM 合成問答與<br/>Critique 過濾管線</h1>
+      <p class="cover-sub">
+        以通用開源 LLM、<strong>繁中標點 Chunking</strong>、<strong>多角色審查</strong>與 <strong>RAFT 開書微調</strong>，免人工標註建構封閉領域專業問答模型。
+      </p>
+      <div class="cover-meta">
+        <div class="cover-meta-card">
+          <div class="label">核心文獻</div>
+          <div class="val">Wu (2024), NTU CSIE 碩論<br/>DOI: 10.6342/NTU202401905</div>
+        </div>
+        <div class="cover-meta-card">
+          <div class="label">封閉實測語料</div>
+          <div class="val">台大醫院耳科遺傳性聽損<br/>12 份繁中 PDF（112 頁）</div>
+        </div>
+        <div class="cover-meta-card">
+          <div class="label">製作模式</div>
+          <div class="val">Paper LLM Wiki StateGraph<br/>預計 20 分鐘 · 共 11 頁</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 02 -->
+    <section class="slide" data-title="動機與定位：封閉領域導入 LLM 四條路線比較" data-notes="延續封面背景，手邊只有 112 頁未公開繁中醫療 PDF 時，四條路線一比就很清楚：TAPT 吃算力、Self-Instruct 生不出模型沒讀過的知識、純 RAG 在小模型上又容易分心。因此 Wu (2024) 選擇第四條路——錨定文件的合成管線搭配 RAFT。接下來看整套系統的三階段全貌。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">01 · Problem &amp; Positioning</div>
+          <h2 class="slide-title">封閉領域導入 LLM：四條路線為何需要新管線？</h2>
+        </div>
+        <span class="slide-badge">四路線比較</span>
+      </header>
+      <div class="slide-body">
+        <div class="card primary" style="padding: 14px 18px;">
+          <table>
+            <thead>
+              <tr><th>方法路線</th><th>人工標註</th><th>主要工程瓶頸</th><th>最適定位</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>TAPT（繼續預訓練）</strong></td><td>否</td><td>耗算力，112 頁小語料難學好</td><td>大語料全參數更新</td>
+              </tr>
+              <tr>
+                <td><strong>純 RAG</strong></td><td>否</td><td>7B–8B 小模型易受干擾段落分心</td><td>快速部署、強大模型</td>
+              </tr>
+              <tr>
+                <td><strong>Self-Instruct / Bonito</strong></td><td>少</td><td>前者難生未見新知；後者需另訓生成器</td><td>通用指令擴增</td>
+              </tr>
+              <tr class="highlight">
+                <td>合成 Q&amp;A + RAFT（本篇）</td><td>幾乎免</td><td>仰賴 Prompt 與 Critique 過濾品質</td><td>封閉小語料＋開源小模型</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout teal">
+          <strong>核心命題</strong>：針對未公開繁中醫療文件，以「<strong>提問 → 作答 → 審查</strong>」嚴格錨定 Chunk 自動量產訓練集，取代數月人工標註，壓縮至 <strong>4 小時～1 週內</strong>完成。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/topics/domain-specific-llm-adaptation.md · Wu (2024) Ch.1–2</span>
+        <span>02 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 03 -->
+    <section class="slide" data-title="架構總覽：三階段端到端流水線" data-notes="看完動機，這張架構圖是接下來每一頁的地圖。整套管線分成前處理、合成與審查、以及 RAFT 微調三個階段，最大特色是完全模組化——裡面的開源 LLM 都能各自獨立替換。接下來我們從 Stage 1 的繁中 Chunking 細節切入。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">02 · End-to-End Architecture</div>
+          <h2 class="slide-title">三階段模組化流水線：從 PDF 到開書考模型</h2>
+        </div>
+        <span class="slide-badge">System Architecture</span>
+      </header>
+      <div class="slide-body">
+        <div class="diagram-box">
+          <svg viewBox="0 0 1080 310" xmlns="http://www.w3.org/2000/svg" aria-label="End-to-End Pipeline">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+              </marker>
+              <marker id="arr-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#0d9488"/>
+              </marker>
+            </defs>
+
+            <rect x="10" y="10" width="240" height="290" rx="14" fill="rgba(79,70,229,0.06)" stroke="#c7d2fe" stroke-dasharray="5,4"/>
+            <text x="130" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#4f46e5">STAGE 1 · 資料前處理</text>
+
+            <rect x="270" y="10" width="490" height="290" rx="14" fill="rgba(13,148,136,0.06)" stroke="#99f6e4" stroke-dasharray="5,4"/>
+            <text x="515" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#0d9488">STAGE 2 · 合成問答與 Critique 過濾</text>
+
+            <rect x="780" y="10" width="290" height="290" rx="14" fill="rgba(217,119,6,0.06)" stroke="#fde68a" stroke-dasharray="5,4"/>
+            <text x="925" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#d97706">STAGE 3 · RAFT 微調與推論</text>
+
+            <rect x="30" y="54" width="200" height="56" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="2"/>
+            <text x="130" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">非結構化 PDF (112 頁)</text>
+            <text x="130" y="97" text-anchor="middle" font-size="11" fill="#475569">Recursive Splitter (512, 0)</text>
+
+            <rect x="30" y="136" width="200" height="52" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+            <text x="130" y="159" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">LLM 抽取 Keywords</text>
+            <text x="130" y="177" text-anchor="middle" font-size="11" fill="#475569">存為 Chunk Metadata</text>
+
+            <rect x="30" y="216" width="200" height="62" rx="10" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.8"/>
+            <text x="130" y="241" text-anchor="middle" font-size="13" font-weight="700" fill="#312e81">Vector Database</text>
+            <text x="130" y="260" text-anchor="middle" font-size="11" fill="#4338ca">acge_text_embedding</text>
+
+            <line x1="130" y1="110" x2="130" y2="134" stroke="#64748b" stroke-width="1.8" marker-end="url(#arr)"/>
+            <line x1="130" y1="188" x2="130" y2="214" stroke="#64748b" stroke-width="1.8" marker-end="url(#arr)"/>
+
+            <rect x="292" y="60" width="190" height="70" rx="10" fill="#ffffff" stroke="#0d9488" stroke-width="2"/>
+            <text x="387" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Question Generator</text>
+            <text x="387" y="102" text-anchor="middle" font-size="11" fill="#475569">病患 / 資淺醫師</text>
+            <text x="387" y="119" text-anchor="middle" font-size="11" font-weight="700" fill="#0d9488">5 整段 + 2×關鍵字 = 11 題</text>
+
+            <rect x="292" y="164" width="190" height="70" rx="10" fill="#ffffff" stroke="#0d9488" stroke-width="2"/>
+            <text x="387" y="188" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Answer Generator</text>
+            <text x="387" y="206" text-anchor="middle" font-size="11" fill="#475569">資深專科醫師</text>
+            <text x="387" y="223" text-anchor="middle" font-size="11" font-weight="700" fill="#0d9488">每題生成 3 候選答案</text>
+
+            <rect x="530" y="108" width="210" height="82" rx="10" fill="#f0fdfa" stroke="#0d9488" stroke-width="2.2"/>
+            <text x="635" y="134" text-anchor="middle" font-size="14" font-weight="800" fill="#134e4a">Critique LLM</text>
+            <text x="635" y="154" text-anchor="middle" font-size="11" fill="#0f766e">4 維度打分 (1–5 分)</text>
+            <text x="635" y="172" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">各 ≥ 3 且總分 ≥ 13</text>
+
+            <rect x="530" y="224" width="210" height="54" rx="10" fill="#fff1f2" stroke="#e11d48" stroke-width="1.6"/>
+            <text x="635" y="247" text-anchor="middle" font-size="12" font-weight="700" fill="#9f1239">Low Quality (部分回收)</text>
+            <text x="635" y="265" text-anchor="middle" font-size="11" fill="#be123c">改寫答案為拒答句</text>
+
+            <line x1="230" y1="84" x2="290" y2="84" stroke="#64748b" stroke-width="1.8" marker-end="url(#arr)"/>
+            <line x1="230" y1="162" x2="262" y2="162" stroke="#64748b" stroke-width="1.5"/>
+            <line x1="262" y1="162" x2="262" y2="104" stroke="#64748b" stroke-width="1.5"/>
+            <line x1="262" y1="104" x2="290" y2="104" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+            <line x1="387" y1="130" x2="387" y2="162" stroke="#0d9488" stroke-width="2" marker-end="url(#arr-t)"/>
+            <line x1="482" y1="199" x2="506" y2="199" stroke="#0d9488" stroke-width="2"/>
+            <line x1="506" y1="199" x2="506" y2="149" stroke="#0d9488" stroke-width="2"/>
+            <line x1="506" y1="149" x2="528" y2="149" stroke="#0d9488" stroke-width="2" marker-end="url(#arr-t)"/>
+            <line x1="635" y1="190" x2="635" y2="222" stroke="#e11d48" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+            <rect x="802" y="66" width="246" height="82" rx="10" fill="#ffffff" stroke="#d97706" stroke-width="2"/>
+            <text x="925" y="91" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">RAFT 資料集 {P, C, Q, A}</text>
+            <text x="925" y="111" text-anchor="middle" font-size="11" fill="#475569">80%: 1 正解 + 4 干擾</text>
+            <text x="925" y="129" text-anchor="middle" font-size="11" fill="#475569">20%: 5 干擾 Chunks</text>
+
+            <rect x="802" y="186" width="246" height="90" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+            <text x="925" y="212" text-anchor="middle" font-size="14" font-weight="800" fill="#92400e">Final LLM (QLoRA r=64)</text>
+            <text x="925" y="232" text-anchor="middle" font-size="11" fill="#b45309">推論接入 Top-5 Retrieved</text>
+            <text x="925" y="250" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">模擬「開書考」作答</text>
+
+            <line x1="740" y1="136" x2="800" y2="107" stroke="#0d9488" stroke-width="2" marker-end="url(#arr-t)"/>
+            <line x1="740" y1="251" x2="772" y2="251" stroke="#e11d48" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <line x1="772" y1="251" x2="772" y2="122" stroke="#e11d48" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <line x1="772" y1="122" x2="800" y2="122" stroke="#e11d48" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+            <line x1="925" y1="148" x2="925" y2="184" stroke="#d97706" stroke-width="2" marker-end="url(#arr)"/>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">3 模組</div>
+            <div class="stat-label">Gen / Critique / Final 獨立可換</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num teal">33 組 / Chunk</div>
+            <div class="stat-label">11 題 × 3 候選答案自動量產</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">4h ～ &lt;1 週</div>
+            <div class="stat-label">自動化資料集建置耗時</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2024-wu-llm-finetune-dataset-from-unstructured-data.md · Fig. 1.1 &amp; 3.3</span>
+        <span>03 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 04 -->
+    <section class="slide" data-title="Step 1：繁中標點 Chunking 與 0 Overlap 實測" data-notes="進入 Stage 1 的第一個反直覺發現：大家做 RAG 常習慣設 overlap=100，但實測顯示配合全形標點斷點後，overlap=0 在兩款模型上都比 overlap=100 高出約 10 個百分點。原因在於重疊文字會讓相鄰 chunk 向量過於接近、干擾 Top-1 排名。切好段落並抽出關鍵字後，下一頁看怎麼用角色扮演量產問答。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">03 · Step 1 — Data Pre-processing</div>
+          <h2 class="slide-title">繁中標點 Chunking：為何 <code>overlap = 0</code> 反而更準？</h2>
+        </div>
+        <span class="slide-badge">Chunking &amp; Metadata</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2-wide">
+          <div class="card primary">
+            <h3>Recursive Splitter 繁中斷點表（Table 4.2）</h3>
+            <div class="pill-row">
+              <span class="pill">\n</span>
+              <span class="pill">\n\n</span>
+              <span class="pill">" "</span>
+              <span class="pill">.</span>
+              <span class="pill">,</span>
+              <span class="pill accent">\u200B</span>
+              <span class="pill accent">，(\uff0c)</span>
+              <span class="pill accent">、(\u3001)</span>
+              <span class="pill accent">．(\uff0e)</span>
+              <span class="pill accent">。(\u3002)</span>
+            </div>
+            <h3 style="margin-top: 6px;">LLM 關鍵字抽取（取代 TF-IDF）</h3>
+            <p>每段抽 ~3 個關鍵字存 Metadata，兼顧檢索與定向產題：</p>
+            <div class="callout" style="padding: 9px 12px; font-size: 0.85rem;">
+              <strong>Fig. 3.2 實例</strong>：<code>性聯遺傳</code>、<code>POU3F4(DFNX2)</code>、<code>粒線體遺傳</code>
+            </div>
+          </div>
+
+          <div class="card teal">
+            <h3>Top-1 檢索命中率（Table 4.4 · Top-5 皆 100%）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span><strong>(512, 0)</strong> · 243 chunks · Breeze</span><strong>67.48%</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 67.48%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>(512, 100) · 265 chunks · Breeze</span><span>57.20%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 57.20%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>(256, 0) · 458 chunks · Breeze</span><span>62.89%</span></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 62.89%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>(256, 100) · 688 chunks · Breeze</span><span>51.74%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 51.74%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span><strong>(512, 0)</strong> · TAIDE 提問組</span><strong>64.82%</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 64.82%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>洞見：配合全形標點收尾後，0 Overlap 可減少相鄰向量干擾（acge_text_embedding）</span>
+        <span>04 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 05 -->
+    <section class="slide" data-title="Step 2：角色扮演與關鍵字雙軌生成" data-notes="這裡有兩個很實用的 Prompt 巧思：第一是用病患與專科醫師角色扮演，讓提問口吻貼近真實問診；第二是只給單一關鍵字強制額外提問，避免模型只會把段落標題改寫成問題。量產出約 8,000 組候選後，下一頁看 Critique LLM 如何把關篩選。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">04 · Step 2 — Synthetic Generation</div>
+          <h2 class="slide-title">角色扮演（Role-Playing）與關鍵字雙軌生成</h2>
+        </div>
+        <span class="slide-badge">Generator LLMs</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card primary">
+            <h3>Question Generator LLM（病患 / 資淺醫師）</h3>
+            <ul>
+              <li><strong>整段視角</strong>：依整段 Chunk 產 <code>5 題</code>貼近問診口吻的問題。</li>
+              <li><strong>關鍵字視角</strong>：單獨依每個關鍵字再產 <code>2 題</code>，打破原敘事限制。</li>
+              <li><strong>合計</strong>：每段穩定產出 <code>11 題 / chunk</code>。</li>
+            </ul>
+          </div>
+          <div class="card teal">
+            <h3>Answer Generator LLM（資深專科醫師）</h3>
+            <ul>
+              <li><strong>嚴格錨定</strong>：逐題配對原 Chunk，限定純依內文作答。</li>
+              <li><strong>多重候選</strong>：每題生成 <code>3 個候選答案</code>供後續汰弱留強。</li>
+              <li><strong>長度上限</strong>：單次生成 <code>max_new_tokens = 600</code>。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-num">243</div>
+            <div class="stat-label">Chunks (512, 0)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num">~2,673</div>
+            <div class="stat-label">合成問題 (× 11)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num teal">~8,019</div>
+            <div class="stat-label">候選 Q&amp;A (× 3)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num amber">~36%</div>
+            <div class="stat-label">Breeze 嚴審留存率</div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/concepts/llm-synthetic-qa-critique-pipeline.md · Wu (2024) Sec. 3.2 &amp; 4.2</span>
+        <span>05 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 06 -->
+    <section class="slide" data-title="Step 3：Critique LLM 四維度審查與門檻" data-notes="進入最關鍵的過濾關卡。四個指標同時卡單項底線與總分，防止單一高分掩蓋缺陷；尤其 Standalone 寫死「出現『在內文中』就給 1 分」是非常值得抄進專案的規則。有趣的是，同一份審查 Prompt 交給不同模型跑，嚴格度竟差了兩倍以上——我們看下一頁的實測數據。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">05 · Step 3 — LLM-as-a-Judge</div>
+          <h2 class="slide-title">Critique LLM：四維度品質審查與強制格式</h2>
+        </div>
+        <span class="slide-badge">Quality Filtering</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-4">
+          <div class="card primary">
+            <h3>1. Groundedness</h3>
+            <p>能否根據給定 <code>Context</code> 毫不含糊回答（1=不能，5=明確）。</p>
+          </div>
+          <div class="card teal">
+            <h3>2. Relevance</h3>
+            <p>是否像一般病患問診時會問的問題，過濾冷僻考題。</p>
+          </div>
+          <div class="card amber">
+            <h3>3. Standalone</h3>
+            <p>問題可獨立理解；出現「在內文中」強制給 <strong>1 分</strong>。</p>
+          </div>
+          <div class="card rose">
+            <h3>4. Similarity</h3>
+            <p>檢查 Q/A 句型重疊，淘汰只會複述題目的假答案。</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="callout teal">
+            <strong>雙重通過門檻</strong>：每項 1–5 分，須同時達 <strong>四項皆 ≥ 3</strong> 且 <strong>總分 ≥ 13 / 20</strong> 才列為 <code>Good Quality</code>。
+          </div>
+          <div class="callout">
+            <strong>強制格式重試（Table 4.5）</strong>：須以 <code>評分:</code> 與 <code>評估:</code> 開頭；錯誤重試率 Breeze <strong>0.161%</strong>（3.26s）、TAIDE <strong>0.176%</strong>（4.28s）。
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/concepts/llm-synthetic-qa-critique-pipeline.md · Wu (2024) Table 4.5 &amp; App. A.1.2</span>
+        <span>06 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 07 -->
+    <section class="slide" data-title="實戰發現 ①：異質模型分工（TAIDE + Breeze）" data-notes="這個實測很具啟發性：不要迷信從頭到尾用同一顆模型！TAIDE 審查太寬鬆，八成以上都放行；改用嚴格的 Breeze 當裁判、搭配 TAIDE 豐富語料出題，品質立刻拉開差距。洗出好資料後，下一頁看下游接 RAFT 微調的效果。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">06 · Empirical Finding 1</div>
+          <h2 class="slide-title">異質模型分工：TAIDE 生題 ＋ Breeze 嚴審奪冠</h2>
+        </div>
+        <span class="slide-badge">Breeze-7B vs. TAIDE-8B</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card primary">
+            <h3>Critique 通過率對比（Table 4.6）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gen Breeze → <strong>Critique Breeze (嚴格)</strong></span><strong>35.73%</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 35.73%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gen TAIDE → <strong>Critique Breeze (嚴格)</strong></span><strong>37.26%</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 37.26%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gen TAIDE → Critique TAIDE (寬鬆)</span><span>79.91%</span></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 79.91%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Gen Breeze → Critique TAIDE (寬鬆)</span><span>88.45%</span></div>
+                <div class="bar-track"><div class="bar-fill amber" style="width: 88.45%;"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card teal">
+            <h3>8 組合冠軍表（Table 4.8，全正例）</h3>
+            <table>
+              <thead>
+                <tr><th>Gen / Critique / Final</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight"><td>TAIDE / Breeze / Breeze</td><td>0.7931</td><td>0.4275</td><td>0.5556</td></tr>
+                <tr><td>Breeze / Breeze / Breeze</td><td>0.7639</td><td>0.4089</td><td>0.5327</td></tr>
+                <tr><td>Breeze / TAIDE / Breeze</td><td>0.7297</td><td>0.4015</td><td>0.5180</td></tr>
+                <tr><td>TAIDE / TAIDE / Breeze</td><td>0.7464</td><td>0.3829</td><td>0.5061</td></tr>
+                <tr><td>TAIDE / TAIDE / TAIDE</td><td>0.6434</td><td>0.3086</td><td>0.4171</td></tr>
+              </tbody>
+            </table>
+            <p style="font-size: 0.84rem;"><strong>分工原因</strong>：TAIDE 台灣語料廣適合生題；Breeze ICL 穩健適合嚴審與作答。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2024-wu-llm-finetune-dataset-from-unstructured-data.md · Table 4.6 &amp; 4.8</span>
+        <span>07 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 08 -->
+    <section class="slide" data-title="實戰發現 ②：下游接 RAFT 的非線性綜效" data-notes="看右邊這張消融圖就能明白為什麼要大費周章做合成資料：對 7B 小模型而言，單接 RAG 反而因為 5 段雜訊上下文分心而略降；透過 RAFT 模擬開書考微調後，F1 一次拉升超過 0.19！接著看一個容易踩雷的設計：低品質問題回收轉拒答。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">07 · Empirical Finding 2</div>
+          <h2 class="slide-title">下游接 RAFT：單用 RAG 或微調都沒用，合用才爆發</h2>
+        </div>
+        <span class="slide-badge">RAFT + QLoRA</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card primary">
+            <h3>RAFT 訓練設定 <code>{P, C, Q, A}</code></h3>
+            <ul>
+              <li><strong>Prompt 一致</strong>：訓練與推論使用相同醫師角色與作答規則（<code>top-k = 5</code>）。</li>
+              <li><strong>80% 樣本</strong>：<code>1 Oracle + 4 Distractors</code>，訓練抗干擾找證據。</li>
+              <li><strong>20% 樣本</strong>：<code>5 Distractors</code>，強化漏檢時之領域記憶。</li>
+              <li><strong>微調參數</strong>：<code>QLoRA r = 64</code>、<code>max_seq_len = 1600</code>、CE Loss。</li>
+            </ul>
+          </div>
+
+          <div class="card teal">
+            <h3>四組設定消融（Table 4.9，Breeze-7B）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>Vanilla Breeze</span><span>F1 0.3592 · P 0.565</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width: 45%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>Fine-tuned only</span><span>F1 0.3608 · P 0.588</span></div>
+                <div class="bar-track"><div class="bar-fill primary" style="width: 46%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span>RAG only（略降）</span><span>F1 0.3471 · P 0.573</span></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 43%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span><strong>Fine-tuned &amp; RAG (RAFT)</strong></span><strong>F1 0.5556 · P 0.793</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 86%;"></div></div>
+              </div>
+            </div>
+            <div class="callout teal" style="padding: 9px 12px; font-size: 0.85rem;">
+              <strong>+0.20 Precision / +0.16 Recall / +0.19 F1</strong>：微調教會小模型如何善用檢索段落。
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/concepts/raft.md · Wu (2024) Sec. 3.3 &amp; Table 4.9</span>
+        <span>08 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 09 -->
+    <section class="slide" data-title="實戰發現 ③：低品質回收轉拒答樣本的雙面刃" data-notes="把沒過審的問題回收改寫成拒答句看似零成本，但實測提醒我們：負樣本比例過高會讓模型變得過度保守。而且還要注意一個潛在衝突——RAFT 的 20% 樣本教模型「沒檢索到也要硬答」，拒答樣本卻教它「沒相關就拒答」，實作上必須明確切割邊界。下一頁我們整理復現這套系統必避的 4 大陷阱。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">08 · Empirical Finding 3</div>
+          <h2 class="slide-title">低品質回收轉「拒答樣本」：巧思與過度拒答代價</h2>
+        </div>
+        <span class="slide-badge">Refusal Trade-off</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card amber">
+            <h3>零成本構造負樣本</h3>
+            <ul>
+              <li>從 Critique 淘汰的 <code>Low Quality</code> 問題中挑選子集。</li>
+              <li>答案改寫為固定拒答句：<code>非常不好意思，目前沒辦法回答您的問題</code>。</li>
+              <li>混入訓練集，教會醫療模型在資訊不足時拒絕硬編。</li>
+            </ul>
+          </div>
+
+          <div class="card rose">
+            <h3>過度拒答代價（Table 4.7 vs. 4.8）</h3>
+            <div class="chart-group">
+              <div class="bar-item">
+                <div class="bar-meta"><span>含低品質拒答（Table 4.7）</span><span>F1 0.4184 · R 0.3048</span></div>
+                <div class="bar-track"><div class="bar-fill rose" style="width: 52%;"></div></div>
+              </div>
+              <div class="bar-item">
+                <div class="bar-meta"><span><strong>移除低品質拒答（Table 4.8）</strong></span><strong>F1 0.5556 · R 0.4275</strong></div>
+                <div class="bar-track"><div class="bar-fill teal" style="width: 78%;"></div></div>
+              </div>
+            </div>
+            <p style="font-size: 0.85rem;">在全正例測試集上，加入拒答樣本使 Recall 降 <code>-0.123</code>、F1 降 <code>-0.137</code>。</p>
+          </div>
+        </div>
+        <div class="callout amber">
+          <strong>調校要點</strong>：控管負樣本佔比、釐清與 RAFT「20% 無正解硬答」之邊界，並建立含「不可回答題」的混合評測集。
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/concepts/llm-synthetic-qa-critique-pipeline.md · Wu (2024) Table 4.7 &amp; 4.8</span>
+        <span>09 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 10 -->
+    <section class="slide" data-title="批判與避坑：復現這套管線必避的 4 個陷阱" data-notes="讀書會最有價值的就是幫大家提前排雷！這 4 個坑是我們比對論文正文與附錄抓出來的：最隱蔽的是坑 1，附錄的 Groundedness Prompt 根本沒把 Answer 傳進去；坑 4 則提醒看 PubMedQA 95.6 分時，別忘了核對開書與閉書的比較公平性。最後一頁收斂成 3 條實作 Checklist 與討論題。">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">09 · Critical Review &amp; Pitfalls</div>
+          <h2 class="slide-title">復現這套管線前，必須先避開的 4 個陷阱</h2>
+        </div>
+        <span class="slide-badge">批判性閱讀</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-4">
+          <div class="card rose">
+            <h3>1. 漏餵 Answer</h3>
+            <p>附錄 Fig. A.1 的 Groundedness 只餵 <code>Q+Context</code>。</p>
+            <p><strong>修正</strong>：必改餵 <code>(Context, Q, A)</code> 才能真擋幻覺。</p>
+          </div>
+          <div class="card amber">
+            <h3>2. 小語料偏差</h3>
+            <p>112 頁讓 Top-5 輕鬆達 <code>1.000</code>，掩蓋檢索瓶頸。</p>
+            <p><strong>修正</strong>：擴展規模須補 Hybrid Search 與 Reranker。</p>
+          </div>
+          <div class="card primary">
+            <h3>3. 關鍵字盲區</h3>
+            <p>僅驗 3 關鍵字且缺摘要所述醫師人工評分表。</p>
+            <p><strong>修正</strong>：無法抓「中字但因果錯」幻覺，須補人工盲測。</p>
+          </div>
+          <div class="card teal">
+            <h3>4. 基準公平性</h3>
+            <p>PubMedQA <code>95.6</code> vs Bonito <code>27.0</code>（Table 4.10）。</p>
+            <p><strong>修正</strong>：須核對基準是否同處開書 RAG 條件。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>來源：wiki/papers/2024-wu-llm-finetune-dataset-from-unstructured-data.md · wiki/benchmarks/pubmedqa.md</span>
+        <span>10 / 11</span>
+      </footer>
+    </section>
+
+    <!-- SLIDE 11 -->
+    <section class="slide" data-title="總結 Checklist 與讀書會討論題" data-notes="最後用 3 條明天就能直接套用的工程準則收尾，也歡迎大家針對右邊三個討論題分享各自做 RAG 或微調的實戰經驗！以上所有細節與原始數據都完整收錄在我們的 Paper LLM Wiki 中。謝謝大家！">
+      <header class="slide-header">
+        <div>
+          <div class="slide-kicker">10 · Takeaways &amp; Discussion</div>
+          <h2 class="slide-title">實作 Checklist 與讀書會討論題</h2>
+        </div>
+        <span class="slide-badge">Wrap-Up &amp; Q&amp;A</span>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card teal">
+            <h3>3 條帶得走的工程 Checklist</h3>
+            <ul>
+              <li><strong>繁中切分</strong>：補全形標點斷點，實測 <code>overlap = 0</code> ＋ 關鍵字雙軌產題。</li>
+              <li><strong>異質嚴審</strong>：生成與審查分模型；Groundedness 必納入 <code>Answer</code>。</li>
+              <li><strong>RAFT 對齊</strong>：小模型採 80/20 干擾微調，鎖定訓練與推論 Prompt 一致。</li>
+            </ul>
+          </div>
+
+          <div class="card primary">
+            <h3>讀書會開放討論題（Q&amp;A）</h3>
+            <ul>
+              <li><strong>Q1 Chunking</strong>：在長篇跨段推論論文上，<code>overlap = 0</code> 還會贏嗎？</li>
+              <li><strong>Q2 成本取捨</strong>：當代強模型＋Reranker 能否靠純 RAG 追上 RAFT？</li>
+              <li><strong>Q3 安全評測</strong>：醫療場景如何設計含正／負例的拒答測試集？</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-footer">
+        <span>Wiki 參考：llm-synthetic-qa-critique-pipeline.md · 2024-wu-*.md · raft.md｜快捷鍵：←/→ · N 筆記 · O 全覽 · F 全螢幕</span>
+        <span>11 / 11</span>
+      </footer>
+    </section>
+
+  </main>
+
+  <aside class="notes-drawer" id="notesDrawer" aria-live="polite">
+    <div class="notes-header">
+      <span>講者筆記（Speaker Notes）</span>
+      <button class="ctrl-btn" id="closeNotesBtn" type="button">關閉 (N)</button>
+    </div>
+    <p class="notes-text" id="notesText"></p>
+  </aside>
+
+  <div class="overview-modal" id="overviewModal" role="dialog" aria-modal="true" aria-label="投影片全覽">
+    <div class="overview-top">
+      <h2 style="font-size: 1.25rem;">投影片全覽（點擊跳轉）</h2>
+      <button class="ctrl-btn" id="closeOverviewBtn" type="button">關閉 (Esc / O)</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <nav class="controls" aria-label="簡報控制列">
+    <button class="ctrl-btn" id="prevBtn" type="button" title="上一頁 (←)">← 上一頁</button>
+    <span class="slide-counter" id="slideCounter">01 / 11</span>
+    <button class="ctrl-btn" id="nextBtn" type="button" title="下一頁 (→)">下一頁 →</button>
+    <button class="ctrl-btn" id="notesBtn" type="button" title="切換講者筆記 (N)">筆記</button>
+    <button class="ctrl-btn" id="overviewBtn" type="button" title="投影片全覽 (O)">全覽</button>
+    <button class="ctrl-btn" id="themeBtn" type="button" title="切換深淺主題">深色</button>
+    <button class="ctrl-btn" id="printBtn" type="button" title="列印或匯出 PDF">匯出 PDF</button>
+  </nav>
+
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const progressFill = document.getElementById('progressFill');
+      const slideCounter = document.getElementById('slideCounter');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const notesBtn = document.getElementById('notesBtn');
+      const closeNotesBtn = document.getElementById('closeNotesBtn');
+      const notesDrawer = document.getElementById('notesDrawer');
+      const notesText = document.getElementById('notesText');
+      const overviewBtn = document.getElementById('overviewBtn');
+      const closeOverviewBtn = document.getElementById('closeOverviewBtn');
+      const overviewModal = document.getElementById('overviewModal');
+      const overviewGrid = document.getElementById('overviewGrid');
+      const themeBtn = document.getElementById('themeBtn');
+      const printBtn = document.getElementById('printBtn');
+
+      let current = 0;
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function renderOverview() {
+        overviewGrid.innerHTML = '';
+        slides.forEach((slide, idx) => {
+          const card = document.createElement('div');
+          card.className = 'overview-card' + (idx === current ? ' current' : '');
+          card.innerHTML =
+            '<div class="overview-num">SLIDE ' + pad(idx + 1) + '</div>' +
+            '<div class="overview-title">' + (slide.dataset.title || ('Slide ' + (idx + 1))) + '</div>';
+          card.addEventListener('click', () => {
+            goTo(idx);
+            overviewModal.classList.remove('open');
+          });
+          overviewGrid.appendChild(card);
+        });
+      }
+
+      function goTo(index) {
+        if (index < 0) index = 0;
+        if (index >= slides.length) index = slides.length - 1;
+        slides[current].classList.remove('active');
+        current = index;
+        slides[current].classList.add('active');
+        slideCounter.textContent = pad(current + 1) + ' / ' + pad(slides.length);
+        progressFill.style.width = ((current + 1) / slides.length * 100) + '%';
+        notesText.textContent = slides[current].dataset.notes || '本頁無額外講者筆記。';
+        history.replaceState(null, '', '#slide-' + (current + 1));
+        if (overviewModal.classList.contains('open')) renderOverview();
+      }
+
+      function toggleNotes() {
+        const isOpen = notesDrawer.classList.toggle('open');
+        notesBtn.classList.toggle('active', isOpen);
+      }
+
+      function toggleOverview() {
+        const isOpen = overviewModal.classList.toggle('open');
+        if (isOpen) renderOverview();
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+          document.documentElement.removeAttribute('data-theme');
+          themeBtn.textContent = '深色';
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          themeBtn.textContent = '淺色';
+        }
+      }
+
+      prevBtn.addEventListener('click', () => goTo(current - 1));
+      nextBtn.addEventListener('click', () => goTo(current + 1));
+      notesBtn.addEventListener('click', toggleNotes);
+      closeNotesBtn.addEventListener('click', toggleNotes);
+      overviewBtn.addEventListener('click', toggleOverview);
+      closeOverviewBtn.addEventListener('click', toggleOverview);
+      themeBtn.addEventListener('click', toggleTheme);
+      printBtn.addEventListener('click', () => window.print());
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          if (!overviewModal.classList.contains('open')) { e.preventDefault(); goTo(current + 1); }
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          if (!overviewModal.classList.contains('open')) { e.preventDefault(); goTo(current - 1); }
+        } else if (e.key === 'Home') { goTo(0); }
+        else if (e.key === 'End') { goTo(slides.length - 1); }
+        else if (e.key.toLowerCase() === 'n') { toggleNotes(); }
+        else if (e.key.toLowerCase() === 'o') { toggleOverview(); }
+        else if (e.key === 'Escape') {
+          overviewModal.classList.remove('open');
+          notesDrawer.classList.remove('open');
+          notesBtn.classList.remove('active');
+        } else if (e.key.toLowerCase() === 'f') {
+          if (!document.fullscreenElement) { document.documentElement.requestFullscreen?.(); }
+          else { document.exitFullscreen?.(); }
+        }
+      });
+
+      let touchStartX = 0;
+      document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+      document.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].screenX - touchStartX;
+        if (dx < -50) goTo(current + 1);
+        if (dx > 50) goTo(current - 1);
+      }, { passive: true });
+
+      const match = window.location.hash.match(/^#slide-(\d+)$/);
+      goTo(match ? parseInt(match[1], 10) - 1 : 0);
+    })();
+  </script>
+</body>
+</html>
